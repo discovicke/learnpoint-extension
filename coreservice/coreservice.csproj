@@ -9,7 +9,6 @@
   <ItemGroup>
     <Folder Include="Application\Events\" />
     <Folder Include="Application\Handlers\" />
-    <Folder Include="Domain\Models\" />
     <Folder Include="Infrastructure\Logging\" />
     <Folder Include="Infrastructure\Repositories\" />
   </ItemGroup>
