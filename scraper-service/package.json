@@ -1,0 +1,13 @@
+{
+  "name": "scraper-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "scrape": "node scraper.js",
+    "scrape:deep": "DEEP_SCRAPE=true node scraper.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "puppeteer": "^23.11.1"
+  }
+}
