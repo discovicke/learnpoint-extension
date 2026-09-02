@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "scrape": "node scraper.js",
-    "scrape:deep": "DEEP_SCRAPE=true node scraper.js"
+    "scrape": "node index.js",
+    "scrape:deep": "DEEP_SCRAPE=true node index.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

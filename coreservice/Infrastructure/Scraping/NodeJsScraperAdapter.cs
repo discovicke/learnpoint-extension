@@ -24,7 +24,7 @@ public class NodeJsScraperAdapter : IScraperService
         var psi = new ProcessStartInfo
         {
             FileName = _nodeCommand,
-            Arguments = "scraper.js",
+            Arguments = "index.js",
             WorkingDirectory = _scraperDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
