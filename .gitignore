@@ -31,6 +31,8 @@ build/
 .env
 .env.*
 !.env.example
+.*-wal
+.*-shm
 
 
 ## macOS
