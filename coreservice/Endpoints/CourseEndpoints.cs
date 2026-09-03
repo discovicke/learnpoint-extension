@@ -7,8 +7,12 @@ public static class CourseEndpoints
 {
     public static void MapCourseEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/courses", async (AppDbContext db) =>
+        app.MapGet("/api/courses", async (AppDbContext db, ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("Endpoint.Courses");
+
+            logger.LogInformation("[Courses] GET /api/courses — Hämtar alla kurser");
+
             var courses = await db.Courses
                 .Include(c => c.Sections)
                     .ThenInclude(s => s.Items)
@@ -31,18 +35,29 @@ public static class CourseEndpoints
                 })
                 .ToListAsync();
 
+            logger.LogInformation("[Courses] ✓ Returnerar {Count} kurser", courses.Count);
             return Results.Ok(courses);
         });
 
-        app.MapGet("/api/courses/{id:int}", async (int id, AppDbContext db) =>
+        app.MapGet("/api/courses/{id:int}", async (int id, AppDbContext db, ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("Endpoint.Courses");
+
+            logger.LogInformation("[Courses] GET /api/courses/{Id} — Hämtar kursdetalj", id);
+
             var course = await db.Courses
                 .Include(c => c.Sections)
                     .ThenInclude(s => s.Items)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            if (course is null) 
+            if (course is null)
+            {
+                logger.LogWarning("[Courses] ⚠ Kurs med ID={Id} hittades inte", id);
                 return Results.NotFound();
+            }
+
+            logger.LogInformation("[Courses] ✓ Returnerar kurs '{Title}' med {SectionCount} sektioner",
+                course.Title, course.Sections.Count);
 
             return Results.Ok(new
             {
@@ -72,22 +87,34 @@ public static class CourseEndpoints
             });
         });
 
-        app.MapGet("/api/courses/{id:int}/current-week", async (int id, AppDbContext db) =>
+        app.MapGet("/api/courses/{id:int}/current-week", async (int id, AppDbContext db, ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("Endpoint.Courses");
+
+            logger.LogInformation("[Courses] GET /api/courses/{Id}/current-week", id);
+
             var course = await db.Courses
                 .Include(c => c.Sections)
                     .ThenInclude(s => s.Items)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            if (course is null) 
+            if (course is null)
+            {
+                logger.LogWarning("[Courses] ⚠ Kurs med ID={Id} hittades inte", id);
                 return Results.NotFound();
+            }
 
             var latestSection = course.Sections
                 .OrderByDescending(s => s.Items.Max(i => i.ScrapedAt))
                 .FirstOrDefault();
 
-            if (latestSection is null) 
+            if (latestSection is null)
+            {
+                logger.LogWarning("[Courses] ⚠ Ingen sektion för kurs {Id}", id);
                 return Results.NotFound(new { message = "Inga sektioner" });
+            }
+
+            logger.LogInformation("[Courses] ✓ Returnerar senaste vecka: '{Title}'", latestSection.Title);
 
             return Results.Ok(new
             {
@@ -105,15 +132,22 @@ public static class CourseEndpoints
             });
         });
 
-        app.MapGet("/api/courses/{id:int}/incomplete", async (int id, AppDbContext db) =>
+        app.MapGet("/api/courses/{id:int}/incomplete", async (int id, AppDbContext db, ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("Endpoint.Courses");
+
+            logger.LogInformation("[Courses] GET /api/courses/{Id}/incomplete", id);
+
             var course = await db.Courses
                 .Include(c => c.Sections)
                     .ThenInclude(s => s.Items)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            if (course is null) 
+            if (course is null)
+            {
+                logger.LogWarning("[Courses] ⚠ Kurs med ID={Id} hittades inte", id);
                 return Results.NotFound();
+            }
 
             var incomplete = course.Sections
                 .SelectMany(s => s.Items.Where(i => i.Status != "Klar"))
@@ -129,18 +163,26 @@ public static class CourseEndpoints
                 })
                 .ToList();
 
+            logger.LogInformation("[Courses] ✓ Returnerar {Count} ej klara items", incomplete.Count);
             return Results.Ok(incomplete);
         });
 
-        app.MapGet("/api/courses/{id:int}/completed", async (int id, AppDbContext db) =>
+        app.MapGet("/api/courses/{id:int}/completed", async (int id, AppDbContext db, ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("Endpoint.Courses");
+
+            logger.LogInformation("[Courses] GET /api/courses/{Id}/completed", id);
+
             var course = await db.Courses
                 .Include(c => c.Sections)
                     .ThenInclude(s => s.Items)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
-            if (course is null) 
+            if (course is null)
+            {
+                logger.LogWarning("[Courses] ⚠ Kurs med ID={Id} hittades inte", id);
                 return Results.NotFound();
+            }
 
             var completed = course.Sections
                 .SelectMany(s => s.Items.Where(i => i.Status == "Klar"))
@@ -156,6 +198,7 @@ public static class CourseEndpoints
                 })
                 .ToList();
 
+            logger.LogInformation("[Courses] ✓ Returnerar {Count} klara items", completed.Count);
             return Results.Ok(completed);
         });
     }
