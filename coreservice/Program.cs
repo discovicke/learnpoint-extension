@@ -11,10 +11,11 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<EventBus>();
-builder.Services.AddSingleton<IEventPublisher, EventBus>();
+builder.Services.AddSingleton<IEventPublisher>(sp => sp.GetRequiredService<EventBus>());
 builder.Services.AddSingleton<IScraperService, NodeJsScraperAdapter>();
 builder.Services.AddHttpClient<IAiSummarizeService, GeminiSummarizeAdapter>();
-builder.Services.AddSingleton<IEventHandler<NewContentUploadedEvent>, AiSummarizeHandler>();
+builder.Services.AddSingleton<IEventHandler<NewContentUploadedEvent>, CourseSyncHandler>();
+builder.Services.AddSingleton<IEventHandler<CourseSyncedEvent>, AiSummarizeHandler>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -27,7 +28,11 @@ using (var scope = app.Services.CreateScope())
 }
 
 var eventBus = app.Services.GetRequiredService<EventBus>();
-var summarizeHandler = app.Services.GetRequiredService<IEventHandler<NewContentUploadedEvent>>();
+
+var syncHandler = app.Services.GetRequiredService<IEventHandler<NewContentUploadedEvent>>();
+var summarizeHandler = app.Services.GetRequiredService<IEventHandler<CourseSyncedEvent>>();
+
+eventBus.Subscribe(syncHandler);
 eventBus.Subscribe(summarizeHandler);
 
 app.MapGet("/health", () => "OK!");

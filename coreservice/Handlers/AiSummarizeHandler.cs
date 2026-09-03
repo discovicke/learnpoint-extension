@@ -1,6 +1,5 @@
 using coreservice.Application.Events;
 using coreservice.Application.Interfaces;
-using coreservice.Domain.Models;
 using coreservice.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,173 +10,65 @@ public class AiSummarizeHandler(
     IAiSummarizeService ai,
     IEventPublisher publisher,
     ILogger<AiSummarizeHandler> logger)
-    : IEventHandler<NewContentUploadedEvent>
+    : IEventHandler<CourseSyncedEvent>
 {
-    public async Task Handle(NewContentUploadedEvent @event)
+    public async Task Handle(CourseSyncedEvent @event)
     {
+        logger.LogInformation(
+            "[AiSummarize] → Startar AI-sammanfattning för kurs '{Title}' (ID={CourseId})",
+            @event.Title, @event.CourseId);
+
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var course = @event.Course;
+        var course = await db.Courses
+            .Include(c => c.Sections)
+                .ThenInclude(s => s.Items)
+            .FirstOrDefaultAsync(c => c.Id == @event.CourseId);
 
-        logger.LogInformation("Bearbetar kurs: {Title} (GroupId={GroupId})", course.GroupTitle, course.GroupId);
+        if (course is null)
+        {
+            logger.LogWarning("[AiSummarize] ⚠ Kurs med ID={CourseId} hittades inte i DB — avbryter", @event.CourseId);
+            return;
+        }
 
-        var tracked = await UpsertCourseAsync(db, course);
-
-        var itemsWithContent = tracked.Sections
+        var itemsWithContent = course.Sections
             .SelectMany(s => s.Items)
             .Where(i => !string.IsNullOrWhiteSpace(i.Content))
             .ToList();
 
-        logger.LogInformation("{Count} items med innehåll att sammanfatta", itemsWithContent.Count);
+        logger.LogInformation(
+            "[AiSummarize]   Hittade {Count} items med innehåll att sammanfatta",
+            itemsWithContent.Count);
 
+        if (itemsWithContent.Count == 0)
+        {
+            logger.LogInformation("[AiSummarize] ✓ Inga items att sammanfatta — klar");
+            return;
+        }
+
+        var summarized = 0;
         foreach (var item in itemsWithContent)
         {
-            logger.LogInformation("Sammanfattar: {Title}", item.Title);
+            logger.LogInformation(
+                "[AiSummarize]   ({Index}/{Total}) Sammanfattar: '{Title}'",
+                summarized + 1, itemsWithContent.Count, item.Title);
 
-            var summary = await ai.SummarizeAsync(item.Content, course.GroupTitle);
+            var summary = await ai.SummarizeAsync(item.Content, course.Title);
             item.AiSummary = summary;
+            summarized++;
 
             await publisher.Publish(new ContentSummarizedEvent(
-                tracked.Id,
+                course.Id,
                 item.Id,
                 summary,
                 DateTime.UtcNow));
         }
 
         await db.SaveChangesAsync();
-        logger.LogInformation("Kurs {Title} komplett — {Count} sammanfattningar sparade",
-            course.GroupTitle, itemsWithContent.Count);
-    }
 
-    private static async Task<TrackedCourse> UpsertCourseAsync(AppDbContext _db, Course course)
-    {
-        var groupId = int.Parse(course.GroupId);
-        var tracked = await _db.Courses
-            .Include(c => c.Sections)
-                .ThenInclude(s => s.Items)
-            .FirstOrDefaultAsync(c => c.GroupId == groupId);
-
-        if (tracked is null)
-        {
-            tracked = new TrackedCourse
-            {
-                GroupId = groupId,
-                Title = course.GroupTitle,
-                SubTitle = course.GroupSubTitle,
-                Grade = course.CourseGrade,
-                LastScrapedAt = course.ScrapedAt,
-                Sections = course.Sections.Select(s => new TrackedSection
-                {
-                    Title = s.Title,
-                    Description = s.Description,
-                    Items = s.Items.Select(i => new TrackedItem
-                    {
-                        ExternalItemId = ExtractItemId(i.Href),
-                        Title = i.Title,
-                        Status = i.Status,
-                        Date = ParseDate(i.Date),
-                        ScrapedAt = course.ScrapedAt,
-                    }).ToList(),
-                }).ToList(),
-            };
-
-            _db.Courses.Add(tracked);
-        }
-        else
-        {
-            tracked.Title = course.GroupTitle;
-            tracked.SubTitle = course.GroupSubTitle;
-            tracked.Grade = course.CourseGrade;
-            tracked.LastScrapedAt = course.ScrapedAt;
-
-            foreach (var section in course.Sections)
-            {
-                var trackedSection = tracked.Sections
-                    .FirstOrDefault(s => s.Title == section.Title);
-
-                if (trackedSection is null)
-                {
-                    trackedSection = new TrackedSection
-                    {
-                        Title = section.Title,
-                        Description = section.Description,
-                        Items = section.Items.Select(i => new TrackedItem
-                        {
-                            ExternalItemId = ExtractItemId(i.Href),
-                            Title = i.Title,
-                            Status = i.Status,
-                            Date = ParseDate(i.Date),
-                            ScrapedAt = course.ScrapedAt,
-                        }).ToList(),
-                    };
-                    tracked.Sections.Add(trackedSection);
-                }
-                else
-                {
-                    trackedSection.Description = section.Description;
-
-                    foreach (var item in section.Items)
-                    {
-                        var trackedItem = trackedSection.Items
-                            .FirstOrDefault(i => i.ExternalItemId == ExtractItemId(item.Href));
-
-                        if (trackedItem is null)
-                        {
-                            trackedSection.Items.Add(new TrackedItem
-                            {
-                                ExternalItemId = ExtractItemId(item.Href),
-                                Title = item.Title,
-                                Status = item.Status,
-                                Date = ParseDate(item.Date),
-                                ScrapedAt = course.ScrapedAt,
-                            });
-                        }
-                        else
-                        {
-                            trackedItem.Title = item.Title;
-                            trackedItem.Status = item.Status;
-                            trackedItem.Date = ParseDate(item.Date);
-                            trackedItem.ScrapedAt = course.ScrapedAt;
-                        }
-                    }
-                }
-            }
-
-            foreach (var item in course.Items)
-            {
-                var existing = tracked.Sections
-                    .SelectMany(s => s.Items)
-                    .FirstOrDefault(i => i.ExternalItemId == item.ItemId);
-
-                if (existing is not null)
-                {
-                    existing.Content = item.Content;
-                    existing.AiSummary = null; 
-                    existing.ScrapedAt = item.ScrapedAt;
-                }
-            }
-        }
-
-        await _db.SaveChangesAsync();
-        return tracked;
-    }
-
-    private static string ExtractItemId(string href)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(href, @"ItemId=(\d+)");
-        return match.Success 
-            ? match.Groups[1].Value 
-            : href;
-    }
-
-    private static DateTime? ParseDate(string date)
-    {
-        if (string.IsNullOrWhiteSpace(date)) 
-            return null;
-        
-        return DateTime.TryParse(date, out var result) 
-            ? result 
-            : null;
+        logger.LogInformation(
+            "[AiSummarize] ✓ Kurs '{Title}' komplett — {Count}/{Total} sammanfattningar sparade",
+            course.Title, summarized, itemsWithContent.Count);
     }
 }
