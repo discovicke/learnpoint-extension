@@ -27,12 +27,23 @@ dist/
 build/
 .cache/
 
+## JetBrains / Rider
+.idea/
+
 ## Environment
 .env
 .env.*
 !.env.example
-.*-wal
-.*-shm
+
+## SQLite
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*-shm
+*-wal
 
 
 ## macOS
