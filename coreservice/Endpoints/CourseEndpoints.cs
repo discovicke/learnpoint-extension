@@ -1,3 +1,4 @@
+using coreservice.Application.Interfaces;
 using coreservice.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,7 +40,7 @@ public static class CourseEndpoints
             return Results.Ok(courses);
         });
 
-        app.MapGet("/api/courses/{id:int}", async (int id, AppDbContext db, ILoggerFactory loggerFactory) =>
+        app.MapGet("/api/courses/{id:int}", async (int id, AppDbContext db, ISectionSummaryStore summaries, ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("Endpoint.Courses");
 
@@ -75,6 +76,9 @@ public static class CourseEndpoints
                     HasAiSummary = s.AiSummary is not null,
                     s.AiSummary,
                     s.SummarizedAt,
+                    SummaryFile = s.AiSummary is not null && summaries.Exists(course.Title, s.Title)
+                        ? summaries.GetRelativePath(course.Title, s.Title)
+                        : null,
                     Items = s.Items.Select(i => new
                     {
                         i.Id,
@@ -88,7 +92,7 @@ public static class CourseEndpoints
             });
         });
 
-        app.MapGet("/api/courses/{id:int}/current-week", async (int id, AppDbContext db, ILoggerFactory loggerFactory) =>
+        app.MapGet("/api/courses/{id:int}/current-week", async (int id, AppDbContext db, ISectionSummaryStore summaries, ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("Endpoint.Courses");
 
@@ -124,6 +128,9 @@ public static class CourseEndpoints
                 HasAiSummary = latestSection.AiSummary is not null,
                 AiSummary = latestSection.AiSummary,
                 SummarizedAt = latestSection.SummarizedAt,
+                SummaryFile = latestSection.AiSummary is not null && summaries.Exists(course.Title, latestSection.Title)
+                    ? summaries.GetRelativePath(course.Title, latestSection.Title)
+                    : null,
                 Items = latestSection.Items.Select(i => new
                 {
                     i.Id,

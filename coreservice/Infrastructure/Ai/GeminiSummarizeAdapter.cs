@@ -37,9 +37,26 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
         }
 
         var prompt = $"""
-            Du är en studiehandledare. Sammanfatta följande vecka/moment i en kurs för en junior fullstackstudent.
-            Fokusera på veckans tema, nyckelkoncept och viktiga begrepp. Det ska läsas som en förstudie innan föreläsning om samma område.
-            Svaret ska vara på svenska och max 160 ord.
+            Du är en studiehandledare som skriver förstudiematerial åt en junior fullstackstudent.
+            Nedan får du en veckas innehåll från en kursportal. Mycket av texten är
+            uppgiftsinstruktioner och administration — ditt jobb är att destillera fram
+            KUNSKAPEN: vad ska studenten förstå EFTER veckan?
+
+            Regler:
+            - Definiera varje nyckelkoncept: vad det ÄR och varför det är viktigt. Skriv aldrig
+              bara att ett moment "genomfördes" — förklara begreppen momenten handlar om.
+            - Koppla allt till veckans tema. Ignorera ren administration (datum, salar,
+              utbildningsdagar, inlämningsformaliteter, gruppindelningar).
+            - Svaret ska vara på svenska, max 350 ord, i markdown med exakt dessa rubriker:
+
+            ## Veckans tema
+            2–3 meningar om vad veckan handlar om och varför det är viktigt.
+
+            ## Nyckelkoncept
+            Punktlista. Varje punkt definierar ETT begrepp (fetstil) + 1–2 meningar förklaring.
+
+            ## Att kunna efter veckan
+            Kort punktlista över förmågor/begrepp studenten förväntas behärska.
 
             Kurs: {courseTitle}
             Vecka: {sectionTitle}
@@ -58,7 +75,7 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
             generationConfig = new
             {
                 temperature = 0.3,
-                maxOutputTokens = 1024,
+                maxOutputTokens = 2048,
             }
         };
 
@@ -79,8 +96,19 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
 
         var result = await response.Content.ReadFromJsonAsync<GeminiResponse>();
 
-        return result?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text
-            ?? "Ingen sammanfattning genererad.";
+        var candidate = result?.Candidates?.FirstOrDefault();
+        if (candidate?.FinishReason is { Length: > 0 } finishReason && finishReason != "STOP")
+            _logger.LogWarning("[Gemini] ⚠ Genereringen avslutades med finishReason='{FinishReason}' — svaret kan vara kapat",
+                finishReason);
+
+        // Konkatenera ALLA parts — att bara ta första kapar svaret mitt i meningen.
+        var text = candidate?.Content?.Parts is { Count: > 0 } parts
+            ? string.Concat(parts.Select(p => p.Text ?? ""))
+            : null;
+
+        return string.IsNullOrWhiteSpace(text)
+            ? "Ingen sammanfattning genererad."
+            : text;
     }
 }
 
@@ -94,6 +122,9 @@ internal class GeminiCandidate
 {
     [JsonPropertyName("content")]
     public GeminiContent? Content { get; set; }
+
+    [JsonPropertyName("finishReason")]
+    public string? FinishReason { get; set; }
 }
 
 internal class GeminiContent
