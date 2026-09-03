@@ -24,7 +24,7 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
     {
         var prompt = $"""
             Du är en studiehandledare. Sammanfatta följande kursinnehåll för en junior fullstackstudent.
-            Fokusera på nyckelkoncept och viktiga begrepp. Det ska läsas som en förstudie innan föreläsning om samma ämnen.
+            Fokusera på nyckelkoncept och viktiga begrepp. Det ska läsas som en förstudie innan föreläsning om samma område.
             Svaret ska vara på svenska och max 300 ord.
 
             Kurs: {courseTitle}
