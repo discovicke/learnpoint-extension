@@ -1,5 +1,7 @@
 using coreservice.Application.Events;
 using coreservice.Application.Interfaces;
+using coreservice.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Endpoints;
 
@@ -85,6 +87,42 @@ public static class TriggerEndpoints
                 totalScraped = courses.Count,
                 totalSynced = synced,
             });
+        });
+
+
+        app.MapPost("/api/sections/{sectionId:int}/summarize", async (
+            int sectionId,
+            AppDbContext db,
+            IEventPublisher events,
+            ILoggerFactory loggerFactory) =>
+        {
+            var logger = loggerFactory.CreateLogger("Endpoint.Summarize");
+
+            var section = await db.Sections
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.Id == sectionId);
+
+            if (section is null)
+            {
+                logger.LogWarning("[Summarize] ⚠ Sektion med ID={SectionId} hittades inte", sectionId);
+                return Results.NotFound(new { message = $"Sektion med ID={sectionId} hittades inte." });
+            }
+
+            if (!section.Items.Any(i => !string.IsNullOrWhiteSpace(i.Content)))
+                return Results.BadRequest(new { message = "Sektionen saknar innehåll att sammanfatta." });
+
+            logger.LogInformation(
+                "[Summarize] → POST /api/sections/{SectionId}/summarize — '{Title}' (manuell)",
+                sectionId, section.Title);
+
+            section.AiSummary = null;
+            section.SummarizedAt = null;
+            await db.SaveChangesAsync();
+
+            await events.Publish(new SectionRegisteredEvent(section.TrackedCourseId, section.Id));
+
+            logger.LogInformation("[Summarize] ✓ Event publicerat för '{Title}'", section.Title);
+            return Results.Ok(new { sectionId = section.Id, title = section.Title });
         });
     }
 }

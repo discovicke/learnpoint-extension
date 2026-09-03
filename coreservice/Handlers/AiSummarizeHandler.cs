@@ -8,15 +8,15 @@ namespace coreservice.Handlers;
 public class AiSummarizeHandler(
     IServiceScopeFactory scopeFactory,
     IAiSummarizeService ai,
-    IEventPublisher publisher,
+    IEventPublisher events,
     ILogger<AiSummarizeHandler> logger)
-    : IEventHandler<CourseSyncedEvent>
+    : IEventHandler<SectionRegisteredEvent>
 {
-    public async Task Handle(CourseSyncedEvent @event)
+    public async Task Handle(SectionRegisteredEvent @event)
     {
         logger.LogInformation(
-            "[AiSummarize] → Startar AI-sammanfattning för kurs '{Title}' (ID={CourseId})",
-            @event.Title, @event.CourseId);
+            "[AiSummarize] → SectionRegisteredEvent mottaget (CourseId={CourseId}, SectionId={SectionId})",
+            @event.CourseId, @event.SectionId);
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -32,43 +32,50 @@ public class AiSummarizeHandler(
             return;
         }
 
-        var itemsWithContent = course.Sections
-            .SelectMany(s => s.Items)
-            .Where(i => !string.IsNullOrWhiteSpace(i.Content))
-            .ToList();
-
-        logger.LogInformation(
-            "[AiSummarize]   Hittade {Count} items med innehåll att sammanfatta",
-            itemsWithContent.Count);
-
-        if (itemsWithContent.Count == 0)
+        var section = course.Sections.FirstOrDefault(s => s.Id == @event.SectionId);
+        if (section is null)
         {
-            logger.LogInformation("[AiSummarize] ✓ Inga items att sammanfatta — klar");
+            logger.LogWarning("[AiSummarize] ⚠ Sektion med ID={SectionId} hittades inte i kurs {CourseId} — avbryter",
+                @event.SectionId, @event.CourseId);
             return;
         }
 
-        var summarized = 0;
-        foreach (var item in itemsWithContent)
+        if (section.AiSummary is not null)
         {
-            logger.LogInformation(
-                "[AiSummarize]   ({Index}/{Total}) Sammanfattar: '{Title}'",
-                summarized + 1, itemsWithContent.Count, item.Title);
-
-            var summary = await ai.SummarizeAsync(item.Content, course.Title);
-            item.AiSummary = summary;
-            summarized++;
-
-            await publisher.Publish(new ContentSummarizedEvent(
-                course.Id,
-                item.Id,
-                summary,
-                DateTime.UtcNow));
+            logger.LogInformation("[AiSummarize]   Vecka '{Title}' redan sammanfattad — hoppar över", section.Title);
+            return;
         }
 
-        await db.SaveChangesAsync();
+        var itemsWithContent = section.Items
+            .Where(i => !string.IsNullOrWhiteSpace(i.Content))
+            .Select(i => (i.Title, i.Content))
+            .ToList();
+
+        if (itemsWithContent.Count == 0)
+        {
+            logger.LogInformation("[AiSummarize]   Vecka '{Title}' saknar innehåll — inget att sammanfatta", section.Title);
+            return;
+        }
 
         logger.LogInformation(
-            "[AiSummarize] ✓ Kurs '{Title}' komplett — {Count}/{Total} sammanfattningar sparade",
-            course.Title, summarized, itemsWithContent.Count);
+            "[AiSummarize]   Sammanfattar vecka: '{Title}' ({ItemCount} delmoment med innehåll)",
+            section.Title, itemsWithContent.Count);
+
+        try
+        {
+            section.AiSummary = await ai.SummarizeSectionAsync(
+                section.Title, section.Description, itemsWithContent, course.Title);
+            section.SummarizedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AiSummarize]   ✗ Misslyckades med vecka '{Title}'", section.Title);
+            return;
+        }
+
+        logger.LogInformation("[AiSummarize] ✓ Vecka '{Title}' sammanfattad — publicerar WeekSummarizedEvent", section.Title);
+
+        await events.Publish(new WeekSummarizedEvent(course.Id, section.Id, section.Title, section.AiSummary));
     }
 }

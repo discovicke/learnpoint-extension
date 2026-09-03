@@ -7,5 +7,7 @@ public class TrackedSection
     public TrackedCourse? TrackedCourse { get; set; }
     public string Title { get; set; } = "";
     public string Description { get; set; } = "";
+    public string? AiSummary { get; set; }
+    public DateTime? SummarizedAt { get; set; }
     public List<TrackedItem> Items { get; set; } = [];
 }

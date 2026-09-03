@@ -10,6 +10,5 @@ public class TrackedItem
     public string Status { get; set; } = "";
     public DateTime? Date { get; set; }
     public string Content { get; set; } = "";
-    public string? AiSummary { get; set; }
     public DateTime ScrapedAt { get; set; }
 }

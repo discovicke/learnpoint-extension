@@ -8,6 +8,7 @@ public class AppDbContext : DbContext
     public DbSet<TrackedCourse> Courses => Set<TrackedCourse>();
     public DbSet<TrackedSection> Sections => Set<TrackedSection>();
     public DbSet<TrackedItem> Items => Set<TrackedItem>();
+    public DbSet<Subscriber> Subscribers => Set<Subscriber>();
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
@@ -33,6 +34,11 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TrackedItem>(e =>
         {
             e.HasIndex(i => i.ExternalItemId);
+        });
+
+        modelBuilder.Entity<Subscriber>(e =>
+        {
+            e.HasIndex(s => s.PhoneNumber).IsUnique();
         });
     }
 }

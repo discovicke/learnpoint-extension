@@ -2,5 +2,9 @@
 
 public interface IAiSummarizeService
 {
-    Task<string> SummarizeAsync(string content, string courseTitle);
+    Task<string> SummarizeSectionAsync(
+        string sectionTitle,
+        string sectionDescription,
+        IReadOnlyList<(string Title, string Content)> items,
+        string courseTitle);
 }

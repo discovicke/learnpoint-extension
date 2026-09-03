@@ -72,6 +72,9 @@ public static class CourseEndpoints
                     s.Id,
                     s.Title,
                     s.Description,
+                    HasAiSummary = s.AiSummary is not null,
+                    s.AiSummary,
+                    s.SummarizedAt,
                     Items = s.Items.Select(i => new
                     {
                         i.Id,
@@ -80,8 +83,6 @@ public static class CourseEndpoints
                         i.Status,
                         i.Date,
                         i.ScrapedAt,
-                        HasAiSummary = i.AiSummary is not null,
-                        i.AiSummary,
                     }),
                 }),
             });
@@ -120,14 +121,15 @@ public static class CourseEndpoints
             {
                 Section = latestSection.Title,
                 Description = latestSection.Description,
+                HasAiSummary = latestSection.AiSummary is not null,
+                AiSummary = latestSection.AiSummary,
+                SummarizedAt = latestSection.SummarizedAt,
                 Items = latestSection.Items.Select(i => new
                 {
                     i.Id,
                     i.Title,
                     i.Status,
                     i.Date,
-                    HasAiSummary = i.AiSummary is not null,
-                    i.AiSummary,
                 }),
             });
         });
@@ -158,8 +160,6 @@ public static class CourseEndpoints
                     i.Status,
                     i.Date,
                     Section = course.Sections.First(s => s.Id == i.TrackedSectionId).Title,
-                    HasAiSummary = i.AiSummary is not null,
-                    i.AiSummary,
                 })
                 .ToList();
 
@@ -193,8 +193,6 @@ public static class CourseEndpoints
                     i.Status,
                     i.Date,
                     Section = course.Sections.First(s => s.Id == i.TrackedSectionId).Title,
-                    HasAiSummary = i.AiSummary is not null,
-                    i.AiSummary,
                 })
                 .ToList();
 
