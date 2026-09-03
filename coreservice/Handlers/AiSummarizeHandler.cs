@@ -8,14 +8,15 @@ namespace coreservice.Handlers;
 public class AiSummarizeHandler(
     IServiceScopeFactory scopeFactory,
     IAiSummarizeService ai,
+    IEventPublisher events,
     ILogger<AiSummarizeHandler> logger)
-    : IEventHandler<SummarizeCourseEvent>
+    : IEventHandler<SectionRegisteredEvent>
 {
-    public async Task Handle(SummarizeCourseEvent @event)
+    public async Task Handle(SectionRegisteredEvent @event)
     {
         logger.LogInformation(
-            "[AiSummarize] → Startar AI-sammanfattning för kurs '{Title}' (ID={CourseId})",
-            @event.Title, @event.CourseId);
+            "[AiSummarize] → SectionRegisteredEvent mottaget (CourseId={CourseId}, SectionId={SectionId})",
+            @event.CourseId, @event.SectionId);
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -31,50 +32,50 @@ public class AiSummarizeHandler(
             return;
         }
 
-        var allItems = course.Sections.SelectMany(s => s.Items).ToList();
-
-        var toSummarize = allItems
-            .Where(i => !string.IsNullOrWhiteSpace(i.Content) && i.AiSummary is null)
-            .ToList();
-
-        var skipped = allItems.Count(i => !string.IsNullOrWhiteSpace(i.Content) && i.AiSummary is not null);
-
-        logger.LogInformation(
-            "[AiSummarize]   {ToSummarize} items att sammanfatta, {Skipped} redan sammanfattade (hoppas över)",
-            toSummarize.Count, skipped);
-
-        if (toSummarize.Count == 0)
+        var section = course.Sections.FirstOrDefault(s => s.Id == @event.SectionId);
+        if (section is null)
         {
-            logger.LogInformation("[AiSummarize] ✓ Inget nytt att sammanfatta — klar");
+            logger.LogWarning("[AiSummarize] ⚠ Sektion med ID={SectionId} hittades inte i kurs {CourseId} — avbryter",
+                @event.SectionId, @event.CourseId);
             return;
         }
 
-        var summarized = 0;
-        var failed = 0;
-        foreach (var item in toSummarize)
+        if (section.AiSummary is not null)
         {
-            logger.LogInformation(
-                "[AiSummarize]   ({Index}/{Total}) Sammanfattar: '{Title}'",
-                summarized + failed + 1, toSummarize.Count, item.Title);
-
-            try
-            {
-                item.AiSummary = await ai.SummarizeAsync(item.Content, course.Title);
-                summarized++;
-            }
-            catch (Exception ex)
-            {
-                failed++;
-                logger.LogError(ex,
-                    "[AiSummarize]   ✗ Misslyckades med '{Title}' — fortsätter med nästa",
-                    item.Title);
-            }
+            logger.LogInformation("[AiSummarize]   Vecka '{Title}' redan sammanfattad — hoppar över", section.Title);
+            return;
         }
 
-        await db.SaveChangesAsync();
+        var itemsWithContent = section.Items
+            .Where(i => !string.IsNullOrWhiteSpace(i.Content))
+            .Select(i => (i.Title, i.Content))
+            .ToList();
+
+        if (itemsWithContent.Count == 0)
+        {
+            logger.LogInformation("[AiSummarize]   Vecka '{Title}' saknar innehåll — inget att sammanfatta", section.Title);
+            return;
+        }
 
         logger.LogInformation(
-            "[AiSummarize] ✓ Kurs '{Title}' klar — {Summarized} sammanfattade, {Skipped} hoppade över, {Failed} misslyckade",
-            course.Title, summarized, skipped, failed);
+            "[AiSummarize]   Sammanfattar vecka: '{Title}' ({ItemCount} delmoment med innehåll)",
+            section.Title, itemsWithContent.Count);
+
+        try
+        {
+            section.AiSummary = await ai.SummarizeSectionAsync(
+                section.Title, section.Description, itemsWithContent, course.Title);
+            section.SummarizedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AiSummarize]   ✗ Misslyckades med vecka '{Title}'", section.Title);
+            return;
+        }
+
+        logger.LogInformation("[AiSummarize] ✓ Vecka '{Title}' sammanfattad — publicerar WeekSummarizedEvent", section.Title);
+
+        await events.Publish(new WeekSummarizedEvent(course.Id, section.Id, section.Title, section.AiSummary));
     }
 }

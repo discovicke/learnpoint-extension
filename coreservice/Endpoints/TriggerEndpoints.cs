@@ -89,59 +89,40 @@ public static class TriggerEndpoints
             });
         });
 
-        app.MapPost("/api/summarize/{courseId:int}", async (
-            int courseId,
+
+        app.MapPost("/api/sections/{sectionId:int}/summarize", async (
+            int sectionId,
             AppDbContext db,
             IEventPublisher events,
             ILoggerFactory loggerFactory) =>
         {
             var logger = loggerFactory.CreateLogger("Endpoint.Summarize");
 
-            var course = await db.Courses
-                .Include(c => c.Sections)
-                    .ThenInclude(s => s.Items)
-                .FirstOrDefaultAsync(c => c.Id == courseId);
+            var section = await db.Sections
+                .Include(s => s.Items)
+                .FirstOrDefaultAsync(s => s.Id == sectionId);
 
-            if (course is null)
+            if (section is null)
             {
-                logger.LogWarning("[Summarize] ⚠ Kurs med ID={CourseId} hittades inte", courseId);
-                return Results.NotFound(new { message = $"Kurs med ID={courseId} hittades inte." });
+                logger.LogWarning("[Summarize] ⚠ Sektion med ID={SectionId} hittades inte", sectionId);
+                return Results.NotFound(new { message = $"Sektion med ID={sectionId} hittades inte." });
             }
 
-            var itemsWithContent = course.Sections
-                .SelectMany(s => s.Items)
-                .Where(i => !string.IsNullOrWhiteSpace(i.Content))
-                .ToList();
-
-            var alreadySummarized = itemsWithContent.Count(i => i.AiSummary is not null);
+            if (!section.Items.Any(i => !string.IsNullOrWhiteSpace(i.Content)))
+                return Results.BadRequest(new { message = "Sektionen saknar innehåll att sammanfatta." });
 
             logger.LogInformation(
-                "[Summarize] → POST /api/summarize/{CourseId} — '{Title}': {Total} items med innehåll, {Skipped} redan sammanfattade",
-                courseId, course.Title, itemsWithContent.Count, alreadySummarized);
+                "[Summarize] → POST /api/sections/{SectionId}/summarize — '{Title}' (manuell)",
+                sectionId, section.Title);
 
-            await events.Publish(new SummarizeCourseEvent(course.Id, course.Title));
+            section.AiSummary = null;
+            section.SummarizedAt = null;
+            await db.SaveChangesAsync();
 
-            var afterCount = await db.Courses
-                .Where(c => c.Id == courseId)
-                .SelectMany(c => c.Sections)
-                .SelectMany(s => s.Items)
-                .CountAsync(i => !string.IsNullOrWhiteSpace(i.Content) && i.AiSummary != null);
+            await events.Publish(new SectionRegisteredEvent(section.TrackedCourseId, section.Id));
 
-            var summarized = afterCount - alreadySummarized;
-            var skipped = alreadySummarized;
-
-            logger.LogInformation(
-                "[Summarize] ✓ Kurs '{Title}' klar — {Summarized} nya, {Skipped} hoppade över, {Total} med innehåll",
-                course.Title, summarized, skipped, itemsWithContent.Count);
-
-            return Results.Ok(new
-            {
-                courseId = course.Id,
-                title = course.Title,
-                summarized,
-                skipped,
-                total = itemsWithContent.Count,
-            });
+            logger.LogInformation("[Summarize] ✓ Event publicerat för '{Title}'", section.Title);
+            return Results.Ok(new { sectionId = section.Id, title = section.Title });
         });
     }
 }

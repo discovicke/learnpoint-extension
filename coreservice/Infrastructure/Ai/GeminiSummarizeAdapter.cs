@@ -22,17 +22,31 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
         _model = config.GetValue<string>("GoogleAi:Model") ?? "gemini-3.5-flash";
     }
 
-    public async Task<string> SummarizeAsync(string content, string courseTitle)
+    public async Task<string> SummarizeSectionAsync(
+        string sectionTitle,
+        string sectionDescription,
+        IReadOnlyList<(string Title, string Content)> items,
+        string courseTitle)
     {
+        var sb = new StringBuilder();
+        foreach (var (title, content) in items)
+        {
+            sb.AppendLine($"### {title}");
+            sb.AppendLine(content);
+            sb.AppendLine();
+        }
+
         var prompt = $"""
-            Du är en studiehandledare. Sammanfatta följande kursinnehåll för en junior fullstackstudent.
-            Fokusera på nyckelkoncept och viktiga begrepp. Det ska läsas som en förstudie innan föreläsning om samma område.
-            Svaret ska vara på svenska och max 300 ord.
+            Du är en studiehandledare. Sammanfatta följande vecka/moment i en kurs för en junior fullstackstudent.
+            Fokusera på veckans tema, nyckelkoncept och viktiga begrepp. Det ska läsas som en förstudie innan föreläsning om samma område.
+            Svaret ska vara på svenska och max 160 ord.
 
             Kurs: {courseTitle}
+            Vecka: {sectionTitle}
+            Beskrivning: {sectionDescription}
 
-            Innehåll:
-            {content}
+            Delmoment:
+            {sb}
             """;
 
         var requestBody = new

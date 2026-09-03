@@ -8,6 +8,7 @@ namespace coreservice.Handlers;
 
 public class CourseSyncHandler(
     IServiceScopeFactory scopeFactory,
+    IEventPublisher events,
     ILogger<CourseSyncHandler> logger)
     : IEventHandler<NewContentUploadedEvent>
 {
@@ -22,14 +23,28 @@ public class CourseSyncHandler(
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var (tracked, newItems, updatedItems) = await UpsertCourseAsync(db, course);
+        var (tracked, newItems, updatedItems, sectionsToNotify) = await UpsertCourseAsync(db, course);
 
         logger.LogInformation(
-            "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad till DB — {NewItems} nya, {UpdatedItems} uppdaterade (ingen AI anropad)",
+            "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad till DB — {NewItems} nya, {UpdatedItems} uppdaterade",
             tracked.Title, tracked.Id, newItems, updatedItems);
+
+        // Ny vecka/tema i en betygsatt kurs → trigga AI-sammanfattning per sektion.
+        // Betygs-grinden är ett kostnadsskydd: första körningen ska inte
+        // sammanfatta 1,5 år av studier rakt av.
+        foreach (var sectionId in sectionsToNotify)
+        {
+            logger.LogInformation(
+                "[CourseSync] → Publicerar SectionRegisteredEvent (CourseId={CourseId}, SectionId={SectionId})",
+                tracked.Id, sectionId);
+            await events.Publish(new SectionRegisteredEvent(tracked.Id, sectionId));
+        }
+
+        if (sectionsToNotify.Count == 0)
+            logger.LogInformation("[CourseSync]   Inga nya veckor att skicka till AI (ingen ny sektion i betygsatt kurs)");
     }
 
-    private async Task<(TrackedCourse course, int newItems, int updatedItems)> UpsertCourseAsync(AppDbContext _db, Course course)
+    private async Task<(TrackedCourse course, int newItems, int updatedItems, List<int> sectionsToNotify)> UpsertCourseAsync(AppDbContext _db, Course course)
     {
         var groupId = int.Parse(course.GroupId);
         var tracked = await _db.Courses
@@ -39,6 +54,9 @@ public class CourseSyncHandler(
 
         var totalNew = 0;
         var totalUpdated = 0;
+        var newlyAddedSections = new List<TrackedSection>();
+        var gradeWentFromEmptyToSet = false;
+        var isNewCourse = tracked is null;
 
         if (tracked is null)
         {
@@ -67,12 +85,15 @@ public class CourseSyncHandler(
             };
 
             totalNew = tracked.Sections.SelectMany(s => s.Items).Count();
+            newlyAddedSections.AddRange(tracked.Sections);
             _db.Courses.Add(tracked);
         }
         else
         {
             logger.LogDebug("[CourseSync]   Befintlig kurs hittad (ID={Id}, GroupId={GroupId}) — uppdaterar",
                 tracked.Id, groupId);
+
+            gradeWentFromEmptyToSet = !HasGrade(tracked.Grade) && HasGrade(course.CourseGrade);
 
             tracked.Title = course.GroupTitle;
             tracked.SubTitle = course.GroupSubTitle;
@@ -103,10 +124,16 @@ public class CourseSyncHandler(
                     };
                     totalNew += trackedSection.Items.Count;
                     tracked.Sections.Add(trackedSection);
+                    newlyAddedSections.Add(trackedSection);
                 }
                 else
                 {
-                    trackedSection.Description = section.Description;
+                    if (trackedSection.Description != section.Description)
+                    {
+                        trackedSection.Description = section.Description;
+                        trackedSection.AiSummary = null;
+                        trackedSection.SummarizedAt = null;
+                    }
 
                     foreach (var item in section.Items)
                     {
@@ -126,6 +153,10 @@ public class CourseSyncHandler(
                                 ScrapedAt = course.ScrapedAt,
                             });
                             totalNew++;
+
+                            // Nytt delmoment i veckan — ogiltigförklara veckosammanfattningen
+                            trackedSection.AiSummary = null;
+                            trackedSection.SummarizedAt = null;
                         }
                         else
                         {
@@ -138,26 +169,70 @@ public class CourseSyncHandler(
                     }
                 }
             }
+        }
 
-            foreach (var item in course.Items)
+        // Fyll på deep-scrapat Content — även för helt nya kurser, så att en
+        // nyregistrerad vecka har sitt teori/uppgiftsinnehåll redo för AI direkt.
+        var contentsByItemId = new Dictionary<string, CourseItem>();
+        foreach (var scrapedItem in course.Items)
+            contentsByItemId.TryAdd(scrapedItem.ItemId, scrapedItem);
+
+        foreach (var section in tracked.Sections)
+        {
+            foreach (var trackedItem in section.Items)
             {
-                var existing = tracked.Sections
-                    .SelectMany(s => s.Items)
-                    .FirstOrDefault(i => i.ExternalItemId == item.ItemId);
+                if (!contentsByItemId.TryGetValue(trackedItem.ExternalItemId, out var scraped)
+                    || string.IsNullOrWhiteSpace(scraped.Content))
+                    continue;
 
-                if (existing is not null)
+                if (trackedItem.Content != scraped.Content)
                 {
-                    existing.Content = item.Content;
-                    existing.AiSummary = null;
-                    existing.ScrapedAt = item.ScrapedAt;
-                    totalUpdated++;
+                    trackedItem.Content = scraped.Content;
+                    trackedItem.ScrapedAt = scraped.ScrapedAt;
+                    if (!isNewCourse)
+                        totalUpdated++;
+
+                    // Innehållet i veckan har ändrats — ogiltigförklara veckosammanfattningen
+                    section.AiSummary = null;
+                    section.SummarizedAt = null;
+                }
+                else
+                {
+                    trackedItem.ScrapedAt = scraped.ScrapedAt;
                 }
             }
         }
 
         await _db.SaveChangesAsync();
-        return (tracked, totalNew, totalUpdated);
+
+        // Bestäm vilka sektioner som ska skickas till AI: nya sektioner med
+        // innehåll — men bara om kursen har betyg (kostnadsskydd). Om betyget
+        // precis trillade in, skicka alla osammanfattade sektioner retroaktivt.
+        var sectionsToNotify = new List<int>();
+        if (HasGrade(tracked.Grade))
+        {
+            IEnumerable<TrackedSection> candidates = gradeWentFromEmptyToSet
+                ? tracked.Sections.Where(s => s.AiSummary is null)
+                : newlyAddedSections;
+
+            if (gradeWentFromEmptyToSet)
+                logger.LogInformation("[CourseSync]   Betyg satt på kursen — skickar {Count} osammanfattade veckor retroaktivt",
+                    tracked.Sections.Count(s => s.AiSummary is null));
+
+            foreach (var section in candidates)
+            {
+                if (section.Items.Any(i => !string.IsNullOrWhiteSpace(i.Content)))
+                    sectionsToNotify.Add(section.Id);
+                else
+                    logger.LogDebug("[CourseSync]   Hoppar över sektion '{Title}' — saknar innehåll att sammanfatta",
+                        section.Title);
+            }
+        }
+
+        return (tracked, totalNew, totalUpdated, sectionsToNotify);
     }
+
+    private static bool HasGrade(string? grade) => !string.IsNullOrWhiteSpace(grade);
 
     private static string ExtractItemId(string href)
     {

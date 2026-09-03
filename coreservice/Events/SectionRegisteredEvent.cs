@@ -2,4 +2,4 @@ using coreservice.Application.Interfaces;
 
 namespace coreservice.Application.Events;
 
-public record SummarizeCourseEvent(int CourseId, string Title) : IEvent;
+public record SectionRegisteredEvent(int CourseId, int SectionId) : IEvent;

@@ -81,15 +81,15 @@ async Task ShowCourseDetailAsync(HttpClient client)
         var total = section.Items.Count;
         Console.WriteLine($"  [{done}/{total}] {section.Title}");
 
+        if (section.HasAiSummary && section.AiSummary is not null)
+        {
+            Console.WriteLine($"    Veckosammanfattning: {Truncate(section.AiSummary, 120)}");
+        }
+
         foreach (var item in section.Items)
         {
             var icon = item.Status == "Klar" ? "✓" : "○";
             Console.WriteLine($"    {icon} {item.Title}");
-
-            if (item.HasAiSummary && item.AiSummary is not null)
-            {
-                Console.WriteLine($"      Sammanfattning: {Truncate(item.AiSummary, 80)}");
-            }
         }
         Console.WriteLine();
     }
@@ -108,15 +108,15 @@ async Task ShowCurrentWeekAsync(HttpClient client)
     Console.WriteLine($"Vecka: {week.Section}");
     Console.WriteLine($"Beskrivning: {week.Description}\n");
 
+    if (week.HasAiSummary && week.AiSummary is not null)
+    {
+        Console.WriteLine($"Veckosammanfattning:\n{week.AiSummary}\n");
+    }
+
     foreach (var item in week.Items)
     {
         var icon = item.Status == "Klar" ? "✓" : "○";
         Console.WriteLine($"  {icon} {item.Title}");
-
-        if (item.HasAiSummary && item.AiSummary is not null)
-        {
-            Console.WriteLine($"    {item.AiSummary}\n");
-        }
     }
     Console.WriteLine();
 }
@@ -137,9 +137,6 @@ async Task ShowIncompleteAsync(HttpClient client)
         Console.WriteLine($"  ○ {item.Title} ({item.Section})");
         if (item.Date.HasValue)
             Console.WriteLine($"    Deadline: {item.Date:yyyy-MM-dd}");
-
-        if (item.HasAiSummary && item.AiSummary is not null)
-            Console.WriteLine($"    {item.AiSummary}");
         Console.WriteLine();
     }
 }
@@ -178,16 +175,15 @@ record CourseSummary(int Id, int GroupId, string Title, string SubTitle, string 
 record CourseDetail(int Id, int GroupId, string Title, string SubTitle, string Grade,
     DateTime LastScrapedAt, List<SectionDto> Sections);
 
-record SectionDto(int Id, string Title, string Description, List<ItemDto> Items);
+record SectionDto(int Id, string Title, string Description, bool HasAiSummary, string? AiSummary, DateTime? SummarizedAt, List<ItemDto> Items);
 
 record ItemDto(int Id, string ExternalItemId, string Title, string Status, DateTime? Date,
-    DateTime ScrapedAt, bool HasAiSummary, string? AiSummary);
+    DateTime ScrapedAt);
 
-record CurrentWeek(string Section, string Description, List<WeekItemDto> Items);
+record CurrentWeek(string Section, string Description, bool HasAiSummary, string? AiSummary, DateTime? SummarizedAt, List<WeekItemDto> Items);
 
-record WeekItemDto(int Id, string Title, string Status, DateTime? Date, bool HasAiSummary, string? AiSummary);
+record WeekItemDto(int Id, string Title, string Status, DateTime? Date);
 
-record IncompleteItem(int Id, string Title, string Status, DateTime? Date, string Section,
-    bool HasAiSummary, string? AiSummary);
+record IncompleteItem(int Id, string Title, string Status, DateTime? Date, string Section);
 
 record CompletedItem(int Id, string Title, string Status, DateTime? Date, string Section);
