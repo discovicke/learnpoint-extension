@@ -1,53 +1,55 @@
-using System.Net.Http.Json;
 using coreservice.Application.Events;
 using coreservice.Application.Interfaces;
 
 namespace coreservice.Handlers;
 
 public class BuggernautHandler(
-    IHttpClientFactory httpFactory,
+    IBuggernautService buggernaut,
     IConfiguration config,
     ILogger<BuggernautHandler> logger)
     : IEventHandler<WeekSummarizedEvent>
 {
+    private static readonly string[] Difficulties = ["Easy", "Medium", "Hard"];
+
     public async Task Handle(WeekSummarizedEvent @event)
     {
         try
         {
-            var baseUrl = config["Buggernaut:BaseUrl"];
-            if (string.IsNullOrWhiteSpace(baseUrl))
+            var category = config.GetValue<string>("Buggernaut:Category") ?? "General";
+            var dryRun = config.GetValue("Buggernaut:DryRun", false);
+
+            logger.LogInformation("[Buggernaut] → Genererar {Count} uppgifter för '{Title}' (kategori={Category}, Easy→Hard)",
+                Difficulties.Length, @event.Title, category);
+
+            var succeeded = 0;
+            var failed = 0;
+            foreach (var difficulty in Difficulties)
             {
-                logger.LogWarning("[Buggernaut] ⚠ Buggernaut:BaseUrl saknas i konfigurationen — hoppar över uppgiftsgenerering för '{Title}'",
-                    @event.Title);
-                return;
+                try
+                {
+                    var topic = $"{@event.Title}\n\n{@event.AiSummary}";
+                    var result = await buggernaut.GenerateAsync(topic, category, difficulty, dryRun);
+                    if (result.Success)
+                        succeeded++;
+                    else
+                    {
+                        failed++;
+                        logger.LogWarning("[Buggernaut]   ✗ {Difficulty} misslyckades — fortsätter med nästa", difficulty);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    logger.LogError(ex, "[Buggernaut]   ✗ {Difficulty} kastade fel — fortsätter med nästa", difficulty);
+                }
             }
 
-            var difficulty = config.GetValue<string>("Buggernaut:Difficulty") ?? "normal";
-            var url = $"{baseUrl.TrimEnd('/')}/api/buggernaut/generate";
-
-            logger.LogInformation("[Buggernaut] → Genererar 3 uppgifter för '{Title}' (difficulty={Difficulty})",
-                @event.Title, difficulty);
-
-            var client = httpFactory.CreateClient();
-            using var response = await client.PostAsJsonAsync(url, new
-            {
-                topic = @event.AiSummary,
-                count = 3,
-                difficulty,
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var body = await response.Content.ReadAsStringAsync();
-                throw new InvalidOperationException($"Buggernaut-wrappern svarade {(int)response.StatusCode}: {body}");
-            }
-
-            logger.LogInformation("[Buggernaut] ✓ 3 uppgifter skapade för '{Title}'", @event.Title);
+            logger.LogInformation("[Buggernaut] ✓ '{Title}' klar — {Succeeded} lyckade, {Failed} misslyckade",
+                @event.Title, succeeded, failed);
         }
         catch (Exception ex)
         {
-            // Får aldrig kasta — SMS-flödet ska inte påverkas.
-            logger.LogError(ex, "[Buggernaut] ✗ Misslyckades med uppgiftsgenerering för '{Title}'", @event.Title);
+            logger.LogError(ex, "[Buggernaut] ✗ Oväntat fel vid uppgiftsgenerering för '{Title}'", @event.Title);
         }
     }
 }

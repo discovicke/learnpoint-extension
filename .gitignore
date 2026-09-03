@@ -45,6 +45,10 @@ build/
 *-shm
 *-wal
 
+## Generated week summaries + exercises
+summaries/
+exercises/
+
 
 ## macOS
 .DS_Store
