@@ -15,7 +15,7 @@ builder.Services.AddSingleton<IEventPublisher>(sp => sp.GetRequiredService<Event
 builder.Services.AddSingleton<IScraperService, NodeJsScraperAdapter>();
 builder.Services.AddHttpClient<IAiSummarizeService, GeminiSummarizeAdapter>();
 builder.Services.AddSingleton<IEventHandler<NewContentUploadedEvent>, CourseSyncHandler>();
-builder.Services.AddSingleton<IEventHandler<CourseSyncedEvent>, AiSummarizeHandler>();
+builder.Services.AddSingleton<IEventHandler<SummarizeCourseEvent>, AiSummarizeHandler>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -30,7 +30,7 @@ using (var scope = app.Services.CreateScope())
 var eventBus = app.Services.GetRequiredService<EventBus>();
 
 var syncHandler = app.Services.GetRequiredService<IEventHandler<NewContentUploadedEvent>>();
-var summarizeHandler = app.Services.GetRequiredService<IEventHandler<CourseSyncedEvent>>();
+var summarizeHandler = app.Services.GetRequiredService<IEventHandler<SummarizeCourseEvent>>();
 
 eventBus.Subscribe(syncHandler);
 eventBus.Subscribe(summarizeHandler);

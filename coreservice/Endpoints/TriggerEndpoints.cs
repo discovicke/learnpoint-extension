@@ -1,5 +1,7 @@
 using coreservice.Application.Events;
 using coreservice.Application.Interfaces;
+using coreservice.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Endpoints;
 
@@ -84,6 +86,61 @@ public static class TriggerEndpoints
                 totalRequested = groupIds.Count,
                 totalScraped = courses.Count,
                 totalSynced = synced,
+            });
+        });
+
+        app.MapPost("/api/summarize/{courseId:int}", async (
+            int courseId,
+            AppDbContext db,
+            IEventPublisher events,
+            ILoggerFactory loggerFactory) =>
+        {
+            var logger = loggerFactory.CreateLogger("Endpoint.Summarize");
+
+            var course = await db.Courses
+                .Include(c => c.Sections)
+                    .ThenInclude(s => s.Items)
+                .FirstOrDefaultAsync(c => c.Id == courseId);
+
+            if (course is null)
+            {
+                logger.LogWarning("[Summarize] ⚠ Kurs med ID={CourseId} hittades inte", courseId);
+                return Results.NotFound(new { message = $"Kurs med ID={courseId} hittades inte." });
+            }
+
+            var itemsWithContent = course.Sections
+                .SelectMany(s => s.Items)
+                .Where(i => !string.IsNullOrWhiteSpace(i.Content))
+                .ToList();
+
+            var alreadySummarized = itemsWithContent.Count(i => i.AiSummary is not null);
+
+            logger.LogInformation(
+                "[Summarize] → POST /api/summarize/{CourseId} — '{Title}': {Total} items med innehåll, {Skipped} redan sammanfattade",
+                courseId, course.Title, itemsWithContent.Count, alreadySummarized);
+
+            await events.Publish(new SummarizeCourseEvent(course.Id, course.Title));
+
+            var afterCount = await db.Courses
+                .Where(c => c.Id == courseId)
+                .SelectMany(c => c.Sections)
+                .SelectMany(s => s.Items)
+                .CountAsync(i => !string.IsNullOrWhiteSpace(i.Content) && i.AiSummary != null);
+
+            var summarized = afterCount - alreadySummarized;
+            var skipped = alreadySummarized;
+
+            logger.LogInformation(
+                "[Summarize] ✓ Kurs '{Title}' klar — {Summarized} nya, {Skipped} hoppade över, {Total} med innehåll",
+                course.Title, summarized, skipped, itemsWithContent.Count);
+
+            return Results.Ok(new
+            {
+                courseId = course.Id,
+                title = course.Title,
+                summarized,
+                skipped,
+                total = itemsWithContent.Count,
             });
         });
     }

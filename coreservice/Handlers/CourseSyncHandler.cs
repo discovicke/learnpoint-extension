@@ -8,7 +8,6 @@ namespace coreservice.Handlers;
 
 public class CourseSyncHandler(
     IServiceScopeFactory scopeFactory,
-    IEventPublisher publisher,
     ILogger<CourseSyncHandler> logger)
     : IEventHandler<NewContentUploadedEvent>
 {
@@ -26,16 +25,8 @@ public class CourseSyncHandler(
         var (tracked, newItems, updatedItems) = await UpsertCourseAsync(db, course);
 
         logger.LogInformation(
-            "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad — {NewItems} nya, {UpdatedItems} uppdaterade",
+            "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad till DB — {NewItems} nya, {UpdatedItems} uppdaterade (ingen AI anropad)",
             tracked.Title, tracked.Id, newItems, updatedItems);
-
-        await publisher.Publish(new CourseSyncedEvent(
-            tracked.Id,
-            tracked.GroupId,
-            tracked.Title,
-            newItems,
-            updatedItems,
-            DateTime.UtcNow));
     }
 
     private async Task<(TrackedCourse course, int newItems, int updatedItems)> UpsertCourseAsync(AppDbContext _db, Course course)

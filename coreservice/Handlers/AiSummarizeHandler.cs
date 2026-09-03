@@ -8,11 +8,10 @@ namespace coreservice.Handlers;
 public class AiSummarizeHandler(
     IServiceScopeFactory scopeFactory,
     IAiSummarizeService ai,
-    IEventPublisher publisher,
     ILogger<AiSummarizeHandler> logger)
-    : IEventHandler<CourseSyncedEvent>
+    : IEventHandler<SummarizeCourseEvent>
 {
-    public async Task Handle(CourseSyncedEvent @event)
+    public async Task Handle(SummarizeCourseEvent @event)
     {
         logger.LogInformation(
             "[AiSummarize] → Startar AI-sammanfattning för kurs '{Title}' (ID={CourseId})",
@@ -32,43 +31,50 @@ public class AiSummarizeHandler(
             return;
         }
 
-        var itemsWithContent = course.Sections
-            .SelectMany(s => s.Items)
-            .Where(i => !string.IsNullOrWhiteSpace(i.Content))
+        var allItems = course.Sections.SelectMany(s => s.Items).ToList();
+
+        var toSummarize = allItems
+            .Where(i => !string.IsNullOrWhiteSpace(i.Content) && i.AiSummary is null)
             .ToList();
 
-        logger.LogInformation(
-            "[AiSummarize]   Hittade {Count} items med innehåll att sammanfatta",
-            itemsWithContent.Count);
+        var skipped = allItems.Count(i => !string.IsNullOrWhiteSpace(i.Content) && i.AiSummary is not null);
 
-        if (itemsWithContent.Count == 0)
+        logger.LogInformation(
+            "[AiSummarize]   {ToSummarize} items att sammanfatta, {Skipped} redan sammanfattade (hoppas över)",
+            toSummarize.Count, skipped);
+
+        if (toSummarize.Count == 0)
         {
-            logger.LogInformation("[AiSummarize] ✓ Inga items att sammanfatta — klar");
+            logger.LogInformation("[AiSummarize] ✓ Inget nytt att sammanfatta — klar");
             return;
         }
 
         var summarized = 0;
-        foreach (var item in itemsWithContent)
+        var failed = 0;
+        foreach (var item in toSummarize)
         {
             logger.LogInformation(
                 "[AiSummarize]   ({Index}/{Total}) Sammanfattar: '{Title}'",
-                summarized + 1, itemsWithContent.Count, item.Title);
+                summarized + failed + 1, toSummarize.Count, item.Title);
 
-            var summary = await ai.SummarizeAsync(item.Content, course.Title);
-            item.AiSummary = summary;
-            summarized++;
-
-            await publisher.Publish(new ContentSummarizedEvent(
-                course.Id,
-                item.Id,
-                summary,
-                DateTime.UtcNow));
+            try
+            {
+                item.AiSummary = await ai.SummarizeAsync(item.Content, course.Title);
+                summarized++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                logger.LogError(ex,
+                    "[AiSummarize]   ✗ Misslyckades med '{Title}' — fortsätter med nästa",
+                    item.Title);
+            }
         }
 
         await db.SaveChangesAsync();
 
         logger.LogInformation(
-            "[AiSummarize] ✓ Kurs '{Title}' komplett — {Count}/{Total} sammanfattningar sparade",
-            course.Title, summarized, itemsWithContent.Count);
+            "[AiSummarize] ✓ Kurs '{Title}' klar — {Summarized} sammanfattade, {Skipped} hoppade över, {Failed} misslyckade",
+            course.Title, summarized, skipped, failed);
     }
 }
