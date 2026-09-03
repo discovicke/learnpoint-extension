@@ -77,14 +77,43 @@ public class SmsHandler(
         }
     }
 
+    // Max 160 tecken, GSM-7-säkert (inget "–"/"…"/radbrytningar som
+    // tvingar UCS-2 och kapar gränsen till 70 tecken).
     private static string BuildMessage(string title, string summary)
     {
-        const int maxSummaryChars = 300;
-        var shortSummary = summary.Length <= maxSummaryChars
-            ? summary
-            : summary[..(maxSummaryChars - 3)] + "...";
+        const int maxLength = 160;
 
-        return $"Nytt tema: {title}\n{shortSummary}";
+        var cleanTitle = GsmSafe(CollapseWhitespace(title));
+        var teaser = GsmSafe(CollapseWhitespace(summary));
+
+        var head = $"Nytt tema: {cleanTitle}";
+        if (head.Length > 100)
+            head = $"Nytt tema: {TruncateWord(head["Nytt tema: ".Length..], 100 - "Nytt tema: ".Length)}";
+
+        var rest = maxLength - head.Length - 3; // " - "
+        if (rest < 10)
+            return TruncateWord(head, maxLength);
+
+        return $"{head} - {TruncateWord(teaser, rest)}";
+    }
+
+    private static string CollapseWhitespace(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+
+    private static string GsmSafe(string text) =>
+        text.Replace('–', '-').Replace('—', '-').Replace("…", "...").Replace('´', '\'');
+
+    private static string TruncateWord(string text, int maxLength)
+    {
+        if (text.Length <= maxLength)
+            return text;
+
+        var cut = text[..(maxLength - 3)].TrimEnd();
+        var lastSpace = cut.LastIndexOf(' ');
+        if (lastSpace > maxLength / 2)
+            cut = cut[..lastSpace];
+
+        return cut + "...";
     }
 
     private static bool IsValidFrom(string from, out string reason)

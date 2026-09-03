@@ -3,9 +3,11 @@ using coreservice.Application.Interfaces;
 using coreservice.Endpoints;
 using coreservice.Handlers;
 using coreservice.Infrastructure.Ai;
+using coreservice.Infrastructure.Buggernaut;
 using coreservice.Infrastructure.Data;
 using coreservice.Infrastructure.Events;
 using coreservice.Infrastructure.Scraping;
+using coreservice.Infrastructure.Summaries;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,8 +17,11 @@ builder.Services.AddSingleton<IEventPublisher>(sp => sp.GetRequiredService<Event
 builder.Services.AddSingleton<IScraperService, NodeJsScraperAdapter>();
 builder.Services.AddHttpClient<IAiSummarizeService, GeminiSummarizeAdapter>();
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<ISectionSummaryStore, FileSectionSummaryStore>();
+builder.Services.AddSingleton<IBuggernautService, ProcessBuggernautAdapter>();
 builder.Services.AddSingleton<IEventHandler<NewContentUploadedEvent>, CourseSyncHandler>();
 builder.Services.AddSingleton<IEventHandler<SectionRegisteredEvent>, AiSummarizeHandler>();
+builder.Services.AddSingleton<IEventHandler<WeekSummarizedEvent>, SummaryFileHandler>();
 builder.Services.AddSingleton<IEventHandler<WeekSummarizedEvent>, SmsHandler>();
 builder.Services.AddSingleton<IEventHandler<WeekSummarizedEvent>, BuggernautHandler>();
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -38,11 +43,11 @@ var syncHandler = app.Services.GetRequiredService<IEventHandler<NewContentUpload
 var summarizeHandler = app.Services.GetRequiredService<IEventHandler<SectionRegisteredEvent>>();
 var smsHandler = app.Services.GetServices<IEventHandler<WeekSummarizedEvent>>().OfType<SmsHandler>().Single();
 var buggernautHandler = app.Services.GetServices<IEventHandler<WeekSummarizedEvent>>().OfType<BuggernautHandler>().Single();
+var summaryFileHandler = app.Services.GetServices<IEventHandler<WeekSummarizedEvent>>().OfType<SummaryFileHandler>().Single();
 
 eventBus.Subscribe(syncHandler);
 eventBus.Subscribe(summarizeHandler);
-// SMS först, Buggernaut sedan — båda får aldrig kasta (try/catch internt),
-// så den ena påverkar aldrig den andra.
+eventBus.Subscribe(summaryFileHandler);
 eventBus.Subscribe(smsHandler);
 eventBus.Subscribe(buggernautHandler);
 
@@ -53,8 +58,6 @@ app.MapSubscriberEndpoints();
 
 app.Run("http://0.0.0.0:5000");
 
-// EnsureCreated migrerar inte befintliga databaser — lägg till nya
-// kolumner/tabeller manuellt så gamla db-filer inte kraschar.
 static void EnsureSectionSummaryColumns(AppDbContext db)
 {
     var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

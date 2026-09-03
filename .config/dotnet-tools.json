@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "buggernaut": {
+      "version": "1.0.3",
+      "commands": [
+        "buggernaut"
+      ],
+      "rollForward": false
+    }
+  }
+}
