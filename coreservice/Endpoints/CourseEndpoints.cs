@@ -108,9 +108,9 @@ public static class CourseEndpoints
                 logger.LogWarning("[Courses] ⚠ Kurs med ID={Id} hittades inte", id);
                 return Results.NotFound();
             }
-
+            
             var latestSection = course.Sections
-                .OrderByDescending(s => s.Items.Max(i => i.ScrapedAt))
+                .OrderByDescending(s => s.Items.Select(i => (DateTime?)i.ScrapedAt).Max())
                 .FirstOrDefault();
 
             if (latestSection is null)

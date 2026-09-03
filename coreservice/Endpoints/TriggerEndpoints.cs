@@ -108,7 +108,7 @@ public static class TriggerEndpoints
                 return Results.NotFound(new { message = $"Sektion med ID={sectionId} hittades inte." });
             }
 
-            if (!section.Items.Any(i => !string.IsNullOrWhiteSpace(i.Content)))
+            if (section.Items.All(i => string.IsNullOrWhiteSpace(i.Content)))
                 return Results.BadRequest(new { message = "Sektionen saknar innehåll att sammanfatta." });
 
             logger.LogInformation(

@@ -102,7 +102,16 @@ async Task ShowCourseDetailAsync(HttpClient client)
 async Task ShowCurrentWeekAsync(HttpClient client)
 {
     var id = AskForCourseId();
-    var week = await client.GetFromJsonAsync<CurrentWeek>($"/api/courses/{id}/current-week");
+    CurrentWeek? week;
+    try
+    {
+        week = await client.GetFromJsonAsync<CurrentWeek>($"/api/courses/{id}/current-week");
+    }
+    catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
+    {
+        Console.WriteLine($"Kunde inte hämta senaste veckan: {ex.Message}\n");
+        return;
+    }
     if (week is null)
     {
         Console.WriteLine("Ingen vecka hittades.\n");

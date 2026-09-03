@@ -42,7 +42,6 @@ public class SummaryFileHandler(
         }
         catch (Exception ex)
         {
-            // Får aldrig kasta — SMS/Buggernaut ska köras oavsett.
             logger.LogError(ex, "[SummaryFile] ✗ Kunde inte spara fil för '{Title}'", @event.Title);
         }
     }
