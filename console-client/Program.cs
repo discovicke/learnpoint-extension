@@ -85,6 +85,10 @@ async Task ShowCourseDetailAsync(HttpClient client)
         {
             Console.WriteLine($"    Veckosammanfattning: {Truncate(section.AiSummary, 120)}");
         }
+        if (section.SummaryFile is not null)
+        {
+            Console.WriteLine($"    Fil: {section.SummaryFile}");
+        }
 
         foreach (var item in section.Items)
         {
@@ -111,6 +115,10 @@ async Task ShowCurrentWeekAsync(HttpClient client)
     if (week.HasAiSummary && week.AiSummary is not null)
     {
         Console.WriteLine($"Veckosammanfattning:\n{week.AiSummary}\n");
+    }
+    if (week.SummaryFile is not null)
+    {
+        Console.WriteLine($"Fil: {week.SummaryFile}\n");
     }
 
     foreach (var item in week.Items)
@@ -175,12 +183,12 @@ record CourseSummary(int Id, int GroupId, string Title, string SubTitle, string 
 record CourseDetail(int Id, int GroupId, string Title, string SubTitle, string Grade,
     DateTime LastScrapedAt, List<SectionDto> Sections);
 
-record SectionDto(int Id, string Title, string Description, bool HasAiSummary, string? AiSummary, DateTime? SummarizedAt, List<ItemDto> Items);
+record SectionDto(int Id, string Title, string Description, bool HasAiSummary, string? AiSummary, DateTime? SummarizedAt, string? SummaryFile, List<ItemDto> Items);
 
 record ItemDto(int Id, string ExternalItemId, string Title, string Status, DateTime? Date,
     DateTime ScrapedAt);
 
-record CurrentWeek(string Section, string Description, bool HasAiSummary, string? AiSummary, DateTime? SummarizedAt, List<WeekItemDto> Items);
+record CurrentWeek(string Section, string Description, bool HasAiSummary, string? AiSummary, DateTime? SummarizedAt, string? SummaryFile, List<WeekItemDto> Items);
 
 record WeekItemDto(int Id, string Title, string Status, DateTime? Date);
 
