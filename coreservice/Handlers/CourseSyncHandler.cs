@@ -29,9 +29,9 @@ public class CourseSyncHandler(
             "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad till DB — {NewItems} nya, {UpdatedItems} uppdaterade",
             tracked.Title, tracked.Id, newItems, updatedItems);
 
-        // Ny vecka/tema i en betygsatt kurs → trigga AI-sammanfattning per sektion.
-        // Betygs-grinden är ett kostnadsskydd: första körningen ska inte
-        // sammanfatta 1,5 år av studier rakt av.
+        // Ny vecka/tema i en obetygsatt kurs → trigga AI-sammanfattning per sektion.
+        // Omvänd betygs-grind: sammanfattning/notis behövs bara medan kursen
+        // pågår. När betyget väl är satt är kursen avslutad — inga fler events.
         foreach (var sectionId in sectionsToNotify)
         {
             logger.LogInformation(
@@ -41,7 +41,7 @@ public class CourseSyncHandler(
         }
 
         if (sectionsToNotify.Count == 0)
-            logger.LogInformation("[CourseSync]   Inga nya veckor att skicka till AI (ingen ny sektion i betygsatt kurs)");
+            logger.LogInformation("[CourseSync]   Inga nya veckor att skicka till AI (ingen ny sektion i obetygsatt kurs)");
     }
 
     private async Task<(TrackedCourse course, int newItems, int updatedItems, List<int> sectionsToNotify)> UpsertCourseAsync(AppDbContext _db, Course course)
@@ -55,7 +55,6 @@ public class CourseSyncHandler(
         var totalNew = 0;
         var totalUpdated = 0;
         var newlyAddedSections = new List<TrackedSection>();
-        var gradeWentFromEmptyToSet = false;
         var isNewCourse = tracked is null;
 
         if (tracked is null)
@@ -92,8 +91,6 @@ public class CourseSyncHandler(
         {
             logger.LogDebug("[CourseSync]   Befintlig kurs hittad (ID={Id}, GroupId={GroupId}) — uppdaterar",
                 tracked.Id, groupId);
-
-            gradeWentFromEmptyToSet = !HasGrade(tracked.Grade) && HasGrade(course.CourseGrade);
 
             tracked.Title = course.GroupTitle;
             tracked.SubTitle = course.GroupSubTitle;
@@ -206,20 +203,12 @@ public class CourseSyncHandler(
         await _db.SaveChangesAsync();
 
         // Bestäm vilka sektioner som ska skickas till AI: nya sektioner med
-        // innehåll — men bara om kursen har betyg (kostnadsskydd). Om betyget
-        // precis trillade in, skicka alla osammanfattade sektioner retroaktivt.
+        // innehåll — men bara om kursen ännu inte har fått betyg. En betygsatt
+        // kurs är avslutad och behöver inga veckosammanfattningar längre.
         var sectionsToNotify = new List<int>();
-        if (HasGrade(tracked.Grade))
+        if (!HasGrade(tracked.Grade))
         {
-            IEnumerable<TrackedSection> candidates = gradeWentFromEmptyToSet
-                ? tracked.Sections.Where(s => s.AiSummary is null)
-                : newlyAddedSections;
-
-            if (gradeWentFromEmptyToSet)
-                logger.LogInformation("[CourseSync]   Betyg satt på kursen — skickar {Count} osammanfattade veckor retroaktivt",
-                    tracked.Sections.Count(s => s.AiSummary is null));
-
-            foreach (var section in candidates)
+            foreach (var section in newlyAddedSections)
             {
                 if (section.Items.Any(i => !string.IsNullOrWhiteSpace(i.Content)))
                     sectionsToNotify.Add(section.Id);
@@ -227,6 +216,10 @@ public class CourseSyncHandler(
                     logger.LogDebug("[CourseSync]   Hoppar över sektion '{Title}' — saknar innehåll att sammanfatta",
                         section.Title);
             }
+        }
+        else
+        {
+            logger.LogDebug("[CourseSync]   Kursen har betyg — inga AI-events (kursen är avslutad)");
         }
 
         return (tracked, totalNew, totalUpdated, sectionsToNotify);
