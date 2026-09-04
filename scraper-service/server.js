@@ -36,7 +36,7 @@ app.post('/scrape', async (req, res) => {
 });
 
 const server = app.listen(PORT, () => console.log(`scraper-service lyssnar på http://localhost:${PORT}`));
-// Deep-scrape av många grupper tar flera minuter — stäng av Nodes
+// Deep-scrape av många grupper tar flera minuter - stäng av Nodes
 // default request-timeout (300 s) så inte servern klipper anslutningen
 // mitt i en körning. Klienterna (coreservice/console) har egen timeout.
 server.requestTimeout = 0;

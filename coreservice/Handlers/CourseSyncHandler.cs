@@ -17,7 +17,7 @@ public class CourseSyncHandler(
         var course = @event.Course;
 
         logger.LogInformation(
-            "[CourseSync] → Startar synkronisering av kurs '{Title}' (GroupId={GroupId}, {SectionCount} sektioner)",
+            "[CourseSync] Startar synkronisering av kurs '{Title}' (GroupId={GroupId}, {SectionCount} sektioner)",
             course.GroupTitle, course.GroupId, course.Sections.Count);
 
         using var scope = scopeFactory.CreateScope();
@@ -26,16 +26,13 @@ public class CourseSyncHandler(
         var (tracked, newItems, updatedItems, sectionsToNotify) = await UpsertCourseAsync(db, course);
 
         logger.LogInformation(
-            "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad till DB — {NewItems} nya, {UpdatedItems} uppdaterade",
+            "[CourseSync] ✓ Kurs '{Title}' (ID={CourseId}) synkad till DB - {NewItems} nya, {UpdatedItems} uppdaterade",
             tracked.Title, tracked.Id, newItems, updatedItems);
-
-        // Ny vecka/tema i en obetygsatt kurs → trigga AI-sammanfattning per sektion.
-        // Omvänd betygs-grind: sammanfattning/notis behövs bara medan kursen
-        // pågår. När betyget väl är satt är kursen avslutad — inga fler events.
+        
         foreach (var sectionId in sectionsToNotify)
         {
             logger.LogInformation(
-                "[CourseSync] → Publicerar SectionRegisteredEvent (CourseId={CourseId}, SectionId={SectionId})",
+                "[CourseSync] Publicerar SectionRegisteredEvent (CourseId={CourseId}, SectionId={SectionId})",
                 tracked.Id, sectionId);
             await events.Publish(new SectionRegisteredEvent(tracked.Id, sectionId));
         }
@@ -59,7 +56,7 @@ public class CourseSyncHandler(
 
         if (tracked is null)
         {
-            logger.LogDebug("[CourseSync]   Ny kurs hittades inte (GroupId={GroupId}) — skapar ny", groupId);
+            logger.LogDebug("[CourseSync]   Ny kurs hittades inte (GroupId={GroupId}) - skapar ny", groupId);
 
             tracked = new TrackedCourse
             {
@@ -89,7 +86,7 @@ public class CourseSyncHandler(
         }
         else
         {
-            logger.LogDebug("[CourseSync]   Befintlig kurs hittad (ID={Id}, GroupId={GroupId}) — uppdaterar",
+            logger.LogDebug("[CourseSync]   Befintlig kurs hittad (ID={Id}, GroupId={GroupId}) - uppdaterar",
                 tracked.Id, groupId);
 
             tracked.Title = course.GroupTitle;
@@ -151,7 +148,7 @@ public class CourseSyncHandler(
                             });
                             totalNew++;
 
-                            // Nytt delmoment i veckan — ogiltigförklara veckosammanfattningen
+                            // Nytt delmoment i veckan - ogiltigförklara veckosammanfattningen
                             trackedSection.AiSummary = null;
                             trackedSection.SummarizedAt = null;
                         }
@@ -167,9 +164,7 @@ public class CourseSyncHandler(
                 }
             }
         }
-
-        // Fyll på deep-scrapat Content — även för helt nya kurser, så att en
-        // nyregistrerad vecka har sitt teori/uppgiftsinnehåll redo för AI direkt.
+        
         var contentsByItemId = new Dictionary<string, CourseItem>();
         foreach (var scrapedItem in course.Items)
             contentsByItemId.TryAdd(scrapedItem.ItemId, scrapedItem);
@@ -188,8 +183,7 @@ public class CourseSyncHandler(
                     trackedItem.ScrapedAt = scraped.ScrapedAt;
                     if (!isNewCourse)
                         totalUpdated++;
-
-                    // Innehållet i veckan har ändrats — ogiltigförklara veckosammanfattningen
+                    
                     section.AiSummary = null;
                     section.SummarizedAt = null;
                 }
@@ -201,10 +195,7 @@ public class CourseSyncHandler(
         }
 
         await _db.SaveChangesAsync();
-
-        // Bestäm vilka sektioner som ska skickas till AI: nya sektioner med
-        // innehåll — men bara om kursen ännu inte har fått betyg. En betygsatt
-        // kurs är avslutad och behöver inga veckosammanfattningar längre.
+        
         var sectionsToNotify = new List<int>();
         if (!HasGrade(tracked.Grade))
         {
@@ -213,13 +204,13 @@ public class CourseSyncHandler(
                 if (section.Items.Any(i => !string.IsNullOrWhiteSpace(i.Content)))
                     sectionsToNotify.Add(section.Id);
                 else
-                    logger.LogDebug("[CourseSync]   Hoppar över sektion '{Title}' — saknar innehåll att sammanfatta",
+                    logger.LogDebug("[CourseSync]   Hoppar över sektion '{Title}' - saknar innehåll att sammanfatta",
                         section.Title);
             }
         }
         else
         {
-            logger.LogDebug("[CourseSync]   Kursen har betyg — inga AI-events (kursen är avslutad)");
+            logger.LogDebug("[CourseSync]   Kursen har betyg - inga AI-events (kursen är avslutad)");
         }
 
         return (tracked, totalNew, totalUpdated, sectionsToNotify);

@@ -39,21 +39,21 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
         var prompt = $"""
             Du är en studiehandledare som skriver förstudiematerial åt en junior fullstackstudent.
             Nedan får du en veckas innehåll från en kursportal. Mycket av texten är
-            uppgiftsinstruktioner och administration — ditt jobb är att destillera fram
+            uppgiftsinstruktioner och administration. Ditt jobb är att destillera fram
             KUNSKAPEN: vad ska studenten förstå EFTER veckan?
 
             Regler:
             - Definiera varje nyckelkoncept: vad det ÄR och varför det är viktigt. Skriv aldrig
-              bara att ett moment "genomfördes" — förklara begreppen momenten handlar om.
+              bara att ett moment "genomfördes". Förklara begreppen momenten handlar om.
             - Koppla allt till veckans tema. Ignorera ren administration (datum, salar,
               utbildningsdagar, inlämningsformaliteter, gruppindelningar).
             - Svaret ska vara på svenska, max 350 ord, i markdown med exakt dessa rubriker:
 
             ## Veckans tema
-            2–3 meningar om vad veckan handlar om och varför det är viktigt.
+            2-3 meningar om vad veckan handlar om och varför det är viktigt.
 
             ## Nyckelkoncept
-            Punktlista. Varje punkt definierar ETT begrepp (fetstil) + 1–2 meningar förklaring.
+            Punktlista. Varje punkt definierar ETT begrepp (fetstil) + 1-2 meningar förklaring.
 
             ## Att kunna efter veckan
             Kort punktlista över förmågor/begrepp studenten förväntas behärska.
@@ -98,10 +98,10 @@ public class GeminiSummarizeAdapter : IAiSummarizeService
 
         var candidate = result?.Candidates?.FirstOrDefault();
         if (candidate?.FinishReason is { Length: > 0 } finishReason && finishReason != "STOP")
-            _logger.LogWarning("[Gemini] ⚠ Genereringen avslutades med finishReason='{FinishReason}' — svaret kan vara kapat",
+            _logger.LogWarning("[Gemini] ⚠ Genereringen avslutades med finishReason='{FinishReason}' - svaret kan vara kapat",
                 finishReason);
 
-        // Konkatenera ALLA parts — att bara ta första kapar svaret mitt i meningen.
+        // Konkatenera ALLA parts. Att bara ta första kapar svaret mitt i meningen.
         var text = candidate?.Content?.Parts is { Count: > 0 } parts
             ? string.Concat(parts.Select(p => p.Text ?? ""))
             : null;

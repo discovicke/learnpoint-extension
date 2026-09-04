@@ -46,7 +46,7 @@ public class HttpScraperAdapter : IScraperService
             throw new ArgumentException("Minst ett GroupId krävs.", nameof(groupIds));
 
         _logger.LogInformation(
-            "[Scraper] → POST {Base}scrape för {Count} grupper: {GroupIds}",
+            "[Scraper] POST {Base}scrape för {Count} grupper: {GroupIds}",
             _http.BaseAddress, ids.Count, string.Join(", ", ids));
 
         using var response = await _http.PostAsJsonAsync("scrape", new { groupIds = ids });
@@ -86,7 +86,7 @@ public class HttpScraperAdapter : IScraperService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "[Scraper] ⚠ Kunde inte nå scraper-service ({Base}groups) — inga registrerade grupper",
+            _logger.LogWarning(ex, "[Scraper] ⚠ Kunde inte nå scraper-service ({Base}groups) - inga registrerade grupper",
                 _http.BaseAddress);
             return [];
         }

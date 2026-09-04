@@ -119,9 +119,9 @@ export async function scrapeGroups(rawIds) {
             group.items.push(await scrapeItem(page, id, itemId));
           }
         }
-        console.log(`✔ ${group.groupTitle} – ${group.items.length} itemsidor`);
+        console.log(`✔ ${group.groupTitle} - ${group.items.length} itemsidor`);
       } else {
-        console.log(`✔ ${group.groupTitle} – ${group.sections.length} sektioner`);
+        console.log(`✔ ${group.groupTitle} - ${group.sections.length} sektioner`);
       }
       results.push(group);
     }

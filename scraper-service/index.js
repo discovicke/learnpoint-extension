@@ -12,7 +12,7 @@ const OUT_FILE =
 
 async function main() {
   // CLI: scrapear grupperna från .env (LEARNPOINT_GROUP_IDS).
-  // HTTP-läget (server.js) återanvänder scrapeGroups() — ingen duplicerad logik.
+  // HTTP-läget (server.js) återanvänder scrapeGroups() - ingen duplicerad logik.
   const ids = getRegisteredGroupIds();
   if (ids.length === 0) {
     throw new Error('Sätt LEARNPOINT_GROUP_IDS i .env');

@@ -12,7 +12,7 @@ public static class CourseEndpoints
         {
             var logger = loggerFactory.CreateLogger("Endpoint.Courses");
 
-            logger.LogInformation("[Courses] GET /api/courses — Hämtar alla kurser");
+            logger.LogInformation("[Courses] GET /api/courses - Hämtar alla kurser");
 
             var courses = await db.Courses
                 .Include(c => c.Sections)
@@ -44,7 +44,7 @@ public static class CourseEndpoints
         {
             var logger = loggerFactory.CreateLogger("Endpoint.Courses");
 
-            logger.LogInformation("[Courses] GET /api/courses/{Id} — Hämtar kursdetalj", id);
+            logger.LogInformation("[Courses] GET /api/courses/{Id} - Hämtar kursdetalj", id);
 
             var course = await db.Courses
                 .Include(c => c.Sections)

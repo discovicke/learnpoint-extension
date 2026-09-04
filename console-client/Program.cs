@@ -82,7 +82,7 @@ async Task RunWithPause(string header, Func<Task> action)
     catch (TaskCanceledException)
     {
         Console.WriteLine("Anropet tog för lång tid och avbröts (timeout).");
-        Console.WriteLine("Scraping av många grupper kan ta flera minuter — försök med en enskild grupp (val 6).\n");
+        Console.WriteLine("Scraping av många grupper kan ta flera minuter. Försök med en enskild grupp (val 6).\n");
     }
     catch (HttpRequestException ex)
     {

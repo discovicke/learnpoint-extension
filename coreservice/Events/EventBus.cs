@@ -17,7 +17,7 @@ public class EventBus : IEventPublisher
     {
         var eventType = typeof(TEvent);
         handlers.GetOrAdd(eventType, _ => new List<IEventHandler>()).Add(handler);
-        _logger.LogInformation("[EventBus] Prenumerant tillagd: {Handler} för {Event} — totalt {Count}",
+        _logger.LogInformation("[EventBus] Prenumerant tillagd: {Handler} för {Event} - totalt {Count}",
             handler.GetType().Name, eventType.Name,
             handlers.TryGetValue(eventType, out var list) ? list.Count : 0);
     }
@@ -42,7 +42,7 @@ public class EventBus : IEventPublisher
             return;
         }
 
-        _logger.LogInformation("[EventBus] → Publicerar {Event} till {Count} handlare",
+        _logger.LogInformation("[EventBus] Publicerar {Event} till {Count} handlare",
             eventType.Name, value.Count);
 
         foreach (var handler in value.ToList())

@@ -24,14 +24,14 @@ public class SmsHandler(
 
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(from))
             {
-                logger.LogWarning("[Sms] ⚠ 46elks inte konfigurerat (Elks:Username/Password/From saknas) — hoppar över SMS för '{Title}'",
+                logger.LogWarning("[Sms] ⚠ 46elks inte konfigurerat (Elks:Username/Password/From saknas) - hoppar över SMS för '{Title}'",
                     @event.Title);
                 return;
             }
 
             if (!IsValidFrom(from, out var fromError))
             {
-                logger.LogError("[Sms] ✗ Ogiltig Elks:From ('{From}'): {Reason} — uppdatera secret: dotnet user-secrets set \"Elks:From\" \"...\" --project coreservice",
+                logger.LogError("[Sms] ✗ Ogiltig Elks:From ('{From}'): {Reason} - uppdatera secret: dotnet user-secrets set \"Elks:From\" \"...\" --project coreservice",
                     from, fromError);
                 return;
             }
@@ -45,7 +45,7 @@ public class SmsHandler(
 
             if (recipients.Count == 0)
             {
-                logger.LogInformation("[Sms]   Inga prenumeranter registrerade — inget SMS för '{Title}'", @event.Title);
+                logger.LogInformation("[Sms]   Inga prenumeranter registrerade - inget SMS för '{Title}'", @event.Title);
                 return;
             }
 
@@ -67,7 +67,7 @@ public class SmsHandler(
                 }
             }
 
-            logger.LogInformation("[Sms] ✓ '{Title}' — {Sent} skickade, {Failed} misslyckade ({Total} prenumeranter)",
+            logger.LogInformation("[Sms] ✓ '{Title}' - {Sent} skickade, {Failed} misslyckade ({Total} prenumeranter)",
                 @event.Title, sent, failed, recipients.Count);
         }
         catch (Exception ex)
@@ -77,7 +77,7 @@ public class SmsHandler(
         }
     }
 
-    // Max 160 tecken, GSM-7-säkert (inget "–"/"…"/radbrytningar som
+    // Max 160 tecken, GSM-7-säkert (utan unicode-tecken och radbrytningar som
     // tvingar UCS-2 och kapar gränsen till 70 tecken).
     private static string BuildMessage(string title, string summary)
     {
@@ -127,7 +127,7 @@ public class SmsHandler(
                 reason = "";
                 return true;
             }
-            reason = "numerisk avsändare måste vara + följt av 7–15 siffror";
+            reason = "numerisk avsändare måste vara + följt av 7-15 siffror";
             return false;
         }
 
@@ -138,7 +138,7 @@ public class SmsHandler(
                 reason = "";
                 return true;
             }
-            reason = "numerisk avsändare måste vara 7–15 siffror";
+            reason = "numerisk avsändare måste vara 7-15 siffror";
             return false;
         }
 

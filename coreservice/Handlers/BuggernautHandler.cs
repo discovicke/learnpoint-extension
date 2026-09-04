@@ -18,7 +18,7 @@ public class BuggernautHandler(
             var category = config.GetValue<string>("Buggernaut:Category") ?? "General";
             var dryRun = config.GetValue("Buggernaut:DryRun", false);
 
-            logger.LogInformation("[Buggernaut] → Genererar {Count} uppgifter för '{Title}' (kategori={Category}, Easy→Hard)",
+            logger.LogInformation("[Buggernaut] Genererar {Count} uppgifter för '{Title}' (kategori={Category}, Easy till Hard)",
                 Difficulties.Length, @event.Title, category);
 
             var succeeded = 0;
@@ -34,17 +34,17 @@ public class BuggernautHandler(
                     else
                     {
                         failed++;
-                        logger.LogWarning("[Buggernaut]   ✗ {Difficulty} misslyckades — fortsätter med nästa", difficulty);
+                        logger.LogWarning("[Buggernaut]   ✗ {Difficulty} misslyckades - fortsätter med nästa", difficulty);
                     }
                 }
                 catch (Exception ex)
                 {
                     failed++;
-                    logger.LogError(ex, "[Buggernaut]   ✗ {Difficulty} kastade fel — fortsätter med nästa", difficulty);
+                    logger.LogError(ex, "[Buggernaut]   ✗ {Difficulty} kastade fel - fortsätter med nästa", difficulty);
                 }
             }
 
-            logger.LogInformation("[Buggernaut] ✓ '{Title}' klar — {Succeeded} lyckade, {Failed} misslyckade",
+            logger.LogInformation("[Buggernaut] ✓ '{Title}' klar - {Succeeded} lyckade, {Failed} misslyckade",
                 @event.Title, succeeded, failed);
         }
         catch (Exception ex)
