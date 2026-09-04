@@ -2,7 +2,12 @@
 using System.Text.Json;
 
 var baseUrl = args.Length > 0 ? args[0] : "http://localhost:5000";
-var client = new HttpClient { BaseAddress = new Uri(baseUrl) };
+// Scraping av alla grupper kan ta flera minuter - default på 100 s räcker inte.
+var client = new HttpClient
+{
+    BaseAddress = new Uri(baseUrl),
+    Timeout = TimeSpan.FromMinutes(15),
+};
 
 Console.WriteLine("=== Kursklient ===\n");
 
@@ -73,6 +78,11 @@ async Task RunWithPause(string header, Func<Task> action)
     try
     {
         await action();
+    }
+    catch (TaskCanceledException)
+    {
+        Console.WriteLine("Anropet tog för lång tid och avbröts (timeout).");
+        Console.WriteLine("Scraping av många grupper kan ta flera minuter — försök med en enskild grupp (val 6).\n");
     }
     catch (HttpRequestException ex)
     {
