@@ -14,7 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<EventBus>();
 builder.Services.AddSingleton<IEventPublisher>(sp => sp.GetRequiredService<EventBus>());
-builder.Services.AddSingleton<IScraperService, NodeJsScraperAdapter>();
+builder.Services.AddHttpClient<IScraperService, HttpScraperAdapter>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(10);
+});
 builder.Services.AddHttpClient<IAiSummarizeService, GeminiSummarizeAdapter>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ISectionSummaryStore, FileSectionSummaryStore>();
