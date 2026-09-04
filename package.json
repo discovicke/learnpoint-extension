@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently --names \"  core ,scraper\" -c \"green,magenta\" \"npm run dev:coreservice\" \"npm run dev:scraper\"",
+    "dev": "concurrently --names \" core  ,scraper\" -c \"green,magenta\" \"npm run dev:coreservice\" \"npm run dev:scraper\"",
     "start": "npm run dev",
     "dev:coreservice": "dotnet run --project coreservice",
     "dev:scraper": "npm start --prefix scraper-service"
