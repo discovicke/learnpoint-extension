@@ -1,4 +1,4 @@
-﻿namespace coreservice.Application.Interfaces;
+﻿namespace coreservice.Interfaces;
 
 public interface IEventHandler
 {

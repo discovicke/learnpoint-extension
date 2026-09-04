@@ -1,4 +1,4 @@
-namespace coreservice.Domain.Models;
+namespace coreservice.Models;
 
 public class SectionItem
 {

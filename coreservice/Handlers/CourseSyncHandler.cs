@@ -1,7 +1,7 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
-using coreservice.Domain.Models;
+using coreservice.Events;
 using coreservice.Infrastructure.Data;
+using coreservice.Interfaces;
+using coreservice.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Handlers;

@@ -1,5 +1,5 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
+using coreservice.Events;
+using coreservice.Interfaces;
 
 namespace coreservice.Handlers;
 

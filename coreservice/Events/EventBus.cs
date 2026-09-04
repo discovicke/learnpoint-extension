@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
-using coreservice.Application.Interfaces;
+using coreservice.Interfaces;
 
-namespace coreservice.Infrastructure.Events;
+namespace coreservice.Events;
 
 public class EventBus : IEventPublisher
 {

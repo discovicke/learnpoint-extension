@@ -1,5 +1,5 @@
-using coreservice.Application.Interfaces;
 using coreservice.Infrastructure.Data;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Endpoints;

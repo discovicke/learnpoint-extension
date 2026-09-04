@@ -1,4 +1,4 @@
-namespace coreservice.Application.Interfaces;
+namespace coreservice.Interfaces;
 
 public sealed record BuggernautRunResult(bool Success, string? Title, string? ClassName, string Output);
 

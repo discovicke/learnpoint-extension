@@ -1,6 +1,6 @@
-﻿using coreservice.Domain.Models;
+﻿using coreservice.Models;
 
-namespace coreservice.Application.Interfaces;
+namespace coreservice.Interfaces;
 
 public interface IScraperService
 {

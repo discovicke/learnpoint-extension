@@ -1,6 +1,6 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
+using coreservice.Events;
 using coreservice.Infrastructure.Data;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Endpoints;

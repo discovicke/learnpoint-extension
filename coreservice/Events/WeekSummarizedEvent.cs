@@ -1,5 +1,5 @@
-using coreservice.Application.Interfaces;
+using coreservice.Interfaces;
 
-namespace coreservice.Application.Events;
+namespace coreservice.Events;
 
 public record WeekSummarizedEvent(int CourseId, int SectionId, string Title, string AiSummary) : IEvent;

@@ -1,4 +1,4 @@
-using coreservice.Domain.Models;
+using coreservice.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Infrastructure.Data;

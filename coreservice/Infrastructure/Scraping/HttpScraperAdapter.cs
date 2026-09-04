@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using coreservice.Application.Interfaces;
-using coreservice.Domain.Models;
+using coreservice.Interfaces;
+using coreservice.Models;
 
 namespace coreservice.Infrastructure.Scraping;
 

@@ -1,14 +1,13 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
 using coreservice.Endpoints;
+using coreservice.Events;
 using coreservice.Handlers;
 using coreservice.Infrastructure.Ai;
 using coreservice.Infrastructure.Buggernaut;
 using coreservice.Infrastructure.Data;
-using coreservice.Infrastructure.Events;
 using coreservice.Infrastructure.Logging;
 using coreservice.Infrastructure.Scraping;
 using coreservice.Infrastructure.Summaries;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Console;
 
