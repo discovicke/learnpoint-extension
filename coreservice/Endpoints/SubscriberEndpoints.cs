@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
-using coreservice.Domain.Models;
 using coreservice.Infrastructure.Data;
+using coreservice.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Endpoints;

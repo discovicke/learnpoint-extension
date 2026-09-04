@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using coreservice.Application.Interfaces;
+using coreservice.Interfaces;
 
 namespace coreservice.Infrastructure.Buggernaut;
 
@@ -36,7 +36,7 @@ public partial class ProcessBuggernautAdapter : IBuggernautService
         bool dryRun = false)
     {
         _logger.LogInformation(
-            "[Buggernaut] → Kör generate (kategori={Category}, svårighetsgrad={Difficulty}, dryRun={DryRun})",
+            "[Buggernaut] Kör generate (kategori={Category}, svårighetsgrad={Difficulty}, dryRun={DryRun})",
             category, difficulty, dryRun);
 
         var psi = new ProcessStartInfo

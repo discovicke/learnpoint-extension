@@ -1,5 +1,5 @@
-using coreservice.Application.Interfaces;
+using coreservice.Interfaces;
 
-namespace coreservice.Application.Events;
+namespace coreservice.Events;
 
 public record SectionRegisteredEvent(int CourseId, int SectionId) : IEvent;

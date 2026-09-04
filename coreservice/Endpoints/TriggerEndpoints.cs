@@ -1,6 +1,6 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
+using coreservice.Events;
 using coreservice.Infrastructure.Data;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Endpoints;
@@ -18,7 +18,7 @@ public static class TriggerEndpoints
             var logger = loggerFactory.CreateLogger("Endpoint.Trigger");
 
             logger.LogInformation(
-                "[Trigger] → POST /api/trigger/{GroupId} — Scraping startas",
+                "[Trigger] POST /api/trigger/{GroupId} - Scraping startas",
                 groupId);
 
             var course = await scraper.ScrapeCourseAsync(groupId);
@@ -30,7 +30,7 @@ public static class TriggerEndpoints
             await events.Publish(new NewContentUploadedEvent(course, DateTime.UtcNow));
 
             logger.LogInformation(
-                "[Trigger] ✓ Event publicerat — hantering pågår i bakgrunden");
+                "[Trigger] ✓ Event publicerat - hantering pågår i bakgrunden");
 
             return Results.Ok(new
             {
@@ -51,18 +51,18 @@ public static class TriggerEndpoints
             var groupIds = scraper.RegisteredGroupIds;
             if (groupIds.Count == 0)
             {
-                logger.LogWarning("[Trigger] ⚠ Inga registrerade grupper — kan inte trigga 'all'");
-                return Results.BadRequest(new { message = "Inga registrerade grupper i scraper-service/.env" });
+                logger.LogWarning("[Trigger] ⚠ Inga registrerade grupper - kan inte trigga 'all'");
+                return Results.BadRequest(new { message = "Inga registrerade grupper (scraper-service på :5001 svarar inte eller saknar LEARNPOINT_GROUP_IDS)." });
             }
 
             logger.LogInformation(
-                "[Trigger] → POST /api/trigger/all — Deep-scraping av {Count} kurser startas",
+                "[Trigger] POST /api/trigger/all - Deep-scraping av {Count} kurser startas",
                 groupIds.Count);
 
             var courses = await scraper.ScrapeCoursesAsync(groupIds);
 
             logger.LogInformation(
-                "[Trigger]   Hämtade {Count} kurser — publicerar event för varje",
+                "[Trigger]   Hämtade {Count} kurser - publicerar event för varje",
                 courses.Count);
 
             var synced = 0;
@@ -112,7 +112,7 @@ public static class TriggerEndpoints
                 return Results.BadRequest(new { message = "Sektionen saknar innehåll att sammanfatta." });
 
             logger.LogInformation(
-                "[Summarize] → POST /api/sections/{SectionId}/summarize — '{Title}' (manuell)",
+                "[Summarize] POST /api/sections/{SectionId}/summarize - '{Title}' (manuell)",
                 sectionId, section.Title);
 
             section.AiSummary = null;

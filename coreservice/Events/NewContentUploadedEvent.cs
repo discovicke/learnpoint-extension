@@ -1,6 +1,6 @@
-using coreservice.Application.Interfaces;
-using coreservice.Domain.Models;
+using coreservice.Interfaces;
+using coreservice.Models;
 
-namespace coreservice.Application.Events;
+namespace coreservice.Events;
 
 public record NewContentUploadedEvent(Course Course, DateTime UploadedAt) : IEvent;

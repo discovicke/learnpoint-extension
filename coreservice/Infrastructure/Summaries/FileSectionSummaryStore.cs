@@ -1,5 +1,5 @@
 using System.Text;
-using coreservice.Application.Interfaces;
+using coreservice.Interfaces;
 
 namespace coreservice.Infrastructure.Summaries;
 

@@ -1,6 +1,6 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
+using coreservice.Events;
 using coreservice.Infrastructure.Data;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Handlers;
@@ -26,7 +26,7 @@ public class SummaryFileHandler(
             var section = course?.Sections.FirstOrDefault(s => s.Id == @event.SectionId);
             if (section is null)
             {
-                logger.LogWarning("[SummaryFile] ⚠ Sektion {SectionId} hittades inte — ingen fil skrivs", @event.SectionId);
+                logger.LogWarning("[SummaryFile] ⚠ Sektion {SectionId} hittades inte - ingen fil skrivs", @event.SectionId);
                 return;
             }
 
@@ -38,7 +38,7 @@ public class SummaryFileHandler(
                 section.SummarizedAt ?? DateTime.UtcNow,
                 section.Items.Select(i => i.Title).ToList());
 
-            logger.LogInformation("[SummaryFile] ✓ '{Title}' → {RelativePath}", @event.Title, relativePath);
+            logger.LogInformation("[SummaryFile] ✓ '{Title}': {RelativePath}", @event.Title, relativePath);
         }
         catch (Exception ex)
         {

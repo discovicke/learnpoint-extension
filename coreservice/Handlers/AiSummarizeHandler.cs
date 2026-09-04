@@ -1,6 +1,6 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
+using coreservice.Events;
 using coreservice.Infrastructure.Data;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace coreservice.Handlers;
@@ -15,7 +15,7 @@ public class AiSummarizeHandler(
     public async Task Handle(SectionRegisteredEvent @event)
     {
         logger.LogInformation(
-            "[AiSummarize] → SectionRegisteredEvent mottaget (CourseId={CourseId}, SectionId={SectionId})",
+            "[AiSummarize] SectionRegisteredEvent mottaget (CourseId={CourseId}, SectionId={SectionId})",
             @event.CourseId, @event.SectionId);
 
         using var scope = scopeFactory.CreateScope();
@@ -28,21 +28,21 @@ public class AiSummarizeHandler(
 
         if (course is null)
         {
-            logger.LogWarning("[AiSummarize] ⚠ Kurs med ID={CourseId} hittades inte i DB — avbryter", @event.CourseId);
+            logger.LogWarning("[AiSummarize] ⚠ Kurs med ID={CourseId} hittades inte i DB - avbryter", @event.CourseId);
             return;
         }
 
         var section = course.Sections.FirstOrDefault(s => s.Id == @event.SectionId);
         if (section is null)
         {
-            logger.LogWarning("[AiSummarize] ⚠ Sektion med ID={SectionId} hittades inte i kurs {CourseId} — avbryter",
+            logger.LogWarning("[AiSummarize] ⚠ Sektion med ID={SectionId} hittades inte i kurs {CourseId} - avbryter",
                 @event.SectionId, @event.CourseId);
             return;
         }
 
         if (section.AiSummary is not null)
         {
-            logger.LogInformation("[AiSummarize]   Vecka '{Title}' redan sammanfattad — hoppar över", section.Title);
+            logger.LogInformation("[AiSummarize]   Vecka '{Title}' redan sammanfattad - hoppar över", section.Title);
             return;
         }
 
@@ -53,7 +53,7 @@ public class AiSummarizeHandler(
 
         if (itemsWithContent.Count == 0)
         {
-            logger.LogInformation("[AiSummarize]   Vecka '{Title}' saknar innehåll — inget att sammanfatta", section.Title);
+            logger.LogInformation("[AiSummarize]   Vecka '{Title}' saknar innehåll - inget att sammanfatta", section.Title);
             return;
         }
 
@@ -74,7 +74,7 @@ public class AiSummarizeHandler(
             return;
         }
 
-        logger.LogInformation("[AiSummarize] ✓ Vecka '{Title}' sammanfattad — publicerar WeekSummarizedEvent", section.Title);
+        logger.LogInformation("[AiSummarize] ✓ Vecka '{Title}' sammanfattad - publicerar WeekSummarizedEvent", section.Title);
 
         await events.Publish(new WeekSummarizedEvent(course.Id, section.Id, section.Title, section.AiSummary));
     }

@@ -1,20 +1,29 @@
-using coreservice.Application.Events;
-using coreservice.Application.Interfaces;
 using coreservice.Endpoints;
+using coreservice.Events;
 using coreservice.Handlers;
 using coreservice.Infrastructure.Ai;
 using coreservice.Infrastructure.Buggernaut;
 using coreservice.Infrastructure.Data;
-using coreservice.Infrastructure.Events;
+using coreservice.Infrastructure.Logging;
 using coreservice.Infrastructure.Scraping;
 using coreservice.Infrastructure.Summaries;
+using coreservice.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Console;
 
 var builder = WebApplication.CreateBuilder(args);
 
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+builder.Logging.AddConsole(options => options.FormatterName = "brief");
+builder.Logging.AddConsoleFormatter<BriefConsoleFormatter, ConsoleFormatterOptions>();
+
 builder.Services.AddSingleton<EventBus>();
 builder.Services.AddSingleton<IEventPublisher>(sp => sp.GetRequiredService<EventBus>());
-builder.Services.AddSingleton<IScraperService, NodeJsScraperAdapter>();
+builder.Services.AddHttpClient<IScraperService, HttpScraperAdapter>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(15);
+});
 builder.Services.AddHttpClient<IAiSummarizeService, GeminiSummarizeAdapter>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<ISectionSummaryStore, FileSectionSummaryStore>();

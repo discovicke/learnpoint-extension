@@ -2,7 +2,12 @@
 using System.Text.Json;
 
 var baseUrl = args.Length > 0 ? args[0] : "http://localhost:5000";
-var client = new HttpClient { BaseAddress = new Uri(baseUrl) };
+// Scraping av alla grupper kan ta flera minuter - default på 100 s räcker inte.
+var client = new HttpClient
+{
+    BaseAddress = new Uri(baseUrl),
+    Timeout = TimeSpan.FromMinutes(15),
+};
 
 Console.WriteLine("=== Kursklient ===\n");
 
@@ -10,27 +15,29 @@ try
 {
     while (true)
     {
-        Console.WriteLine("Välj åtgärd:");
-        Console.WriteLine("  1. Visa alla kurser");
-        Console.WriteLine("  2. Visa detaljerad kurs");
-        Console.WriteLine("  3. Visa senaste veckan");
-        Console.WriteLine("  4. Visa ej klara uppgifter");
-        Console.WriteLine("  5. Visa klara uppgifter");
-        Console.WriteLine("  0. Avsluta");
-        Console.Write("\nVal: ");
+        ShowMenu();
 
         var choice = Console.ReadLine()?.Trim();
-        Console.WriteLine();
+        Console.Clear();
 
         switch (choice)
         {
-            case "1": await ListCoursesAsync(client); break;
-            case "2": await ShowCourseDetailAsync(client); break;
-            case "3": await ShowCurrentWeekAsync(client); break;
-            case "4": await ShowIncompleteAsync(client); break;
-            case "5": await ShowCompletedAsync(client); break;
+            case "1": await RunWithPause("1. Visa alla kurser", () => ListCoursesAsync(client)); break;
+            case "2": await RunWithPause("2. Visa detaljerad kurs", () => ShowCourseDetailAsync(client)); break;
+            case "3": await RunWithPause("3. Visa senaste veckan", () => ShowCurrentWeekAsync(client)); break;
+            case "4": await RunWithPause("4. Visa ej klara uppgifter", () => ShowIncompleteAsync(client)); break;
+            case "5": await RunWithPause("5. Visa klara uppgifter", () => ShowCompletedAsync(client)); break;
+            case "6": await RunWithPause("6. Trigga scraping för grupp", () => TriggerGroupAsync(client)); break;
+            case "7": await RunWithPause("7. Trigga scraping för alla grupper", () => TriggerAllAsync(client)); break;
+            case "8": await RunWithPause("8. Sammanfatta sektion manuellt", () => SummarizeSectionAsync(client)); break;
+            case "9": await RunWithPause("9. Lista prenumeranter", () => ListSubscribersAsync(client)); break;
+            case "10": await RunWithPause("10. Lägg till prenumerant", () => AddSubscriberAsync(client)); break;
+            case "11": await RunWithPause("11. Ta bort prenumerant", () => DeleteSubscriberAsync(client)); break;
             case "0" or null: return;
-            default: Console.WriteLine("Okänt val.\n"); break;
+            default:
+                Console.WriteLine("Okänt val.\n");
+                Pause();
+                break;
         }
     }
 }
@@ -38,6 +45,56 @@ catch (HttpRequestException ex)
 {
     Console.WriteLine($"Kunde inte ansluta till {baseUrl}: {ex.Message}");
     Console.WriteLine("Kör coreservice först: dotnet run --project coreservice");
+}
+
+void ShowMenu()
+{
+    Console.Clear();
+    Console.WriteLine("=== Kursklient ===\n");
+    Console.WriteLine("[Läsning]");
+    Console.WriteLine("  1. Visa alla kurser");
+    Console.WriteLine("  2. Visa detaljerad kurs");
+    Console.WriteLine("  3. Visa senaste veckan");
+    Console.WriteLine("  4. Visa ej klara uppgifter");
+    Console.WriteLine("  5. Visa klara uppgifter");
+    Console.WriteLine();
+    Console.WriteLine("[Trigger & AI]");
+    Console.WriteLine("  6. Trigga scraping för grupp");
+    Console.WriteLine("  7. Trigga scraping för alla grupper");
+    Console.WriteLine("  8. Sammanfatta sektion manuellt");
+    Console.WriteLine();
+    Console.WriteLine("[Prenumeranter]");
+    Console.WriteLine("  9. Lista prenumeranter");
+    Console.WriteLine(" 10. Lägg till prenumerant");
+    Console.WriteLine(" 11. Ta bort prenumerant");
+    Console.WriteLine();
+    Console.WriteLine("  0. Avsluta");
+    Console.Write("\nVal: ");
+}
+
+async Task RunWithPause(string header, Func<Task> action)
+{
+    Console.WriteLine($"--- {header} ---\n");
+    try
+    {
+        await action();
+    }
+    catch (TaskCanceledException)
+    {
+        Console.WriteLine("Anropet tog för lång tid och avbröts (timeout).");
+        Console.WriteLine("Scraping av många grupper kan ta flera minuter. Försök med en enskild grupp (val 6).\n");
+    }
+    catch (HttpRequestException ex)
+    {
+        Console.WriteLine($"Anropet misslyckades: {ex.Message}\n");
+    }
+    Pause();
+}
+
+void Pause()
+{
+    Console.WriteLine("Tryck Enter för att återgå...");
+    Console.ReadLine();
 }
 
 async Task ListCoursesAsync(HttpClient client)
@@ -79,7 +136,7 @@ async Task ShowCourseDetailAsync(HttpClient client)
     {
         var done = section.Items.Count(i => i.Status == "Klar");
         var total = section.Items.Count;
-        Console.WriteLine($"  [{done}/{total}] {section.Title}");
+        Console.WriteLine($"  [{section.Id}] [{done}/{total}] {section.Title}");
 
         if (section.HasAiSummary && section.AiSummary is not null)
         {
@@ -176,6 +233,125 @@ async Task ShowCompletedAsync(HttpClient client)
     Console.WriteLine();
 }
 
+async Task TriggerGroupAsync(HttpClient client)
+{
+    Console.Write("Ange grupp-ID (Learnpoint): ");
+    if (!int.TryParse(Console.ReadLine()?.Trim(), out var groupId))
+    {
+        Console.WriteLine("Ogiltigt grupp-ID.\n");
+        return;
+    }
+
+    using var response = await client.PostAsync($"/api/trigger/{groupId}", null);
+    if (!await EnsureOk(response)) return;
+
+    var result = await response.Content.ReadFromJsonAsync<TriggerSingleResponse>();
+    Console.WriteLine($"{result?.Message}");
+    Console.WriteLine($"Kurs: {result?.GroupTitle} ({result?.Sections} sektioner, {result?.Items} items)\n");
+}
+
+async Task TriggerAllAsync(HttpClient client)
+{
+    using var response = await client.PostAsync("/api/trigger/all", null);
+    if (!await EnsureOk(response)) return;
+
+    var result = await response.Content.ReadFromJsonAsync<TriggerAllResponse>();
+    Console.WriteLine($"{result?.Message}");
+    Console.WriteLine($"Begärda: {result?.TotalRequested}, scrapade: {result?.TotalScraped}, synkade: {result?.TotalSynced}\n");
+}
+
+async Task SummarizeSectionAsync(HttpClient client)
+{
+    Console.Write("Ange sektions-ID (se kursdetalj för ID): ");
+    if (!int.TryParse(Console.ReadLine()?.Trim(), out var sectionId))
+    {
+        Console.WriteLine("Ogiltigt sektions-ID.\n");
+        return;
+    }
+
+    using var response = await client.PostAsync($"/api/sections/{sectionId}/summarize", null);
+    if (!await EnsureOk(response)) return;
+
+    var result = await response.Content.ReadFromJsonAsync<SummarizeResponse>();
+    Console.WriteLine($"Sammanfattning beställd för '{result?.Title}' (ID={result?.SectionId}).\n");
+}
+
+async Task ListSubscribersAsync(HttpClient client)
+{
+    var subs = await client.GetFromJsonAsync<List<SubscriberDto>>("/api/subscribers");
+    if (subs is null || subs.Count == 0)
+    {
+        Console.WriteLine("Inga prenumeranter registrerade.\n");
+        return;
+    }
+
+    Console.WriteLine($"{"ID",-5} {"Nummer",-18} {"Namn"}");
+    Console.WriteLine(new string('-', 50));
+    foreach (var s in subs)
+        Console.WriteLine($"{s.Id,-5} {s.PhoneNumber,-18} {s.Name}");
+    Console.WriteLine();
+}
+
+async Task AddSubscriberAsync(HttpClient client)
+{
+    Console.Write("Telefonnummer (E.164, t.ex. +46701234567): ");
+    var phone = Console.ReadLine()?.Trim() ?? "";
+    Console.Write("Namn (valfritt): ");
+    var name = Console.ReadLine()?.Trim();
+    if (string.IsNullOrWhiteSpace(name)) name = null;
+
+    using var response = await client.PostAsJsonAsync("/api/subscribers", new { phoneNumber = phone, name });
+    if (!await EnsureOk(response)) return;
+
+    var result = await response.Content.ReadFromJsonAsync<SubscriberDto>();
+    Console.WriteLine($"Tillagd: {result?.PhoneNumber} (ID={result?.Id}).\n");
+}
+
+async Task DeleteSubscriberAsync(HttpClient client)
+{
+    Console.Write("Ange prenumerant-ID: ");
+    if (!int.TryParse(Console.ReadLine()?.Trim(), out var id))
+    {
+        Console.WriteLine("Ogiltigt ID.\n");
+        return;
+    }
+
+    using var response = await client.DeleteAsync($"/api/subscribers/{id}");
+    if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+    {
+        Console.WriteLine("Prenumerant borttagen.\n");
+        return;
+    }
+    await EnsureOk(response);
+}
+
+async Task<bool> EnsureOk(HttpResponseMessage response)
+{
+    if (response.IsSuccessStatusCode) return true;
+    var message = await ReadErrorMessage(response);
+    Console.WriteLine($"Fel {(int)response.StatusCode}: {message}\n");
+    return false;
+}
+
+async Task<string> ReadErrorMessage(HttpResponseMessage response)
+{
+    try
+    {
+        var err = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        if (!string.IsNullOrWhiteSpace(err?.Message)) return err.Message;
+    }
+    catch (Exception) { /* fall igenom till råtext */ }
+    try
+    {
+        var raw = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrWhiteSpace(raw) ? response.ReasonPhrase ?? "okänt fel" : raw;
+    }
+    catch (Exception)
+    {
+        return response.ReasonPhrase ?? "okänt fel";
+    }
+}
+
 int AskForCourseId()
 {
     Console.Write("Ange kurs-ID: ");
@@ -204,3 +380,13 @@ record WeekItemDto(int Id, string Title, string Status, DateTime? Date);
 record IncompleteItem(int Id, string Title, string Status, DateTime? Date, string Section);
 
 record CompletedItem(int Id, string Title, string Status, DateTime? Date, string Section);
+
+record TriggerSingleResponse(string Message, string GroupTitle, int Sections, int Items);
+
+record TriggerAllResponse(string Message, int TotalRequested, int TotalScraped, int TotalSynced);
+
+record SummarizeResponse(int SectionId, string Title);
+
+record SubscriberDto(int Id, string PhoneNumber, string? Name, DateTime CreatedAt);
+
+record ErrorResponse(string? Message);

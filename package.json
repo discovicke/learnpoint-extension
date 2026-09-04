@@ -1,0 +1,15 @@
+{
+  "name": "net25-arkitektur-discovicke",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently --names \" core  ,scraper\" -c \"green,magenta\" \"npm run dev:coreservice\" \"npm run dev:scraper\"",
+    "start": "npm run dev",
+    "dev:coreservice": "dotnet run --project coreservice",
+    "dev:scraper": "npm start --prefix scraper-service"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
