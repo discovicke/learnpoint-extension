@@ -7,7 +7,7 @@ och skickar notiser via SMS plus genererar övningsuppgifter. En vecka/tema är 
 `TrackedSection` (t.ex. "Vecka 1 - Klassiska designmönster"). AI sammanfattar per
 vecka, aldrig per delmoment.
 
-## Arkitekturval: EDA i modulär monolit + ett fristående microservice
+## Arkitekturval: EDA i modulär monolit + en fristående microservice
 
 Systemet är händelsedrivet. Tre domänhändelser kedjar flödet:
 
