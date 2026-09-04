@@ -52,7 +52,7 @@ public static class TriggerEndpoints
             if (groupIds.Count == 0)
             {
                 logger.LogWarning("[Trigger] ⚠ Inga registrerade grupper — kan inte trigga 'all'");
-                return Results.BadRequest(new { message = "Inga registrerade grupper i scraper-service/.env" });
+                return Results.BadRequest(new { message = "Inga registrerade grupper (scraper-service på :5001 svarar inte eller saknar LEARNPOINT_GROUP_IDS)." });
             }
 
             logger.LogInformation(
