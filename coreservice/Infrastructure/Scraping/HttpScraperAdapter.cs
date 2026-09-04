@@ -25,7 +25,7 @@ public class HttpScraperAdapter : IScraperService
 
         var baseUrl = config.GetValue<string>("Scraper:BaseUrl") ?? "http://localhost:5001";
         _http.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
-        _http.Timeout = TimeSpan.FromMinutes(10);
+        _http.Timeout = TimeSpan.FromMinutes(15);
 
         _registeredGroupIds = LoadRegisteredGroupIds();
     }
