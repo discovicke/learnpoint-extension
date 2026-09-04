@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
     "scrape": "node index.js",
     "scrape:deep": "DEEP_SCRAPE=true node index.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "express": "^5.2.1",
     "puppeteer": "^23.11.1"
   }
 }
